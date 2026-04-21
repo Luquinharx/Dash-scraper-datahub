@@ -15,6 +15,7 @@ export interface ClanMemberStat {
 }
 
 type ExclusionMap = Record<string, boolean>;
+type HiddenUsersMap = Record<string, boolean>;
 
 interface BankLogFields {
   action?: string;
@@ -35,6 +36,10 @@ interface BankRun {
 function parseAmountFromCurrency(currency: string): number {
   const digits = (currency || '').replace(/\D/g, '');
   return Number(digits || 0);
+}
+
+function normalizeUsername(value: string): string {
+  return (value || '').trim().toLowerCase();
 }
 
 function toPtBrDateTime(timestampMs: number): string {
@@ -65,28 +70,45 @@ export function useAllClanStats() {
   const { data: scraperData, loading: scraperLoading } = useClanData();
   const [bankData, setBankData] = useState<Record<string, BankRun> | null>(null);
   const [exclusionMap, setExclusionMap] = useState<ExclusionMap>({});
+  const [hiddenUsersMap, setHiddenUsersMap] = useState<HiddenUsersMap>({});
 
   useEffect(() => {
     let mounted = true;
 
     async function loadBankAndExclusions() {
       try {
-        const [runsRes, exclusionsRes] = await Promise.all([
+        const [runsRes, exclusionsRes, hiddenUsersRes] = await Promise.all([
           fetch('https://deadclanbb-1f05e-default-rtdb.firebaseio.com/clan_logs/runs.json'),
           fetch('https://deadclanbb-1f05e-default-rtdb.firebaseio.com/config/donation_exclusions.json'),
+          fetch('https://deadclanbb-1f05e-default-rtdb.firebaseio.com/config/donation_hidden_users.json'),
         ]);
 
         const runsJson = runsRes.ok ? await runsRes.json() : {};
         const exclusionsJson = exclusionsRes.ok ? await exclusionsRes.json() : {};
+        const hiddenUsersJson = hiddenUsersRes.ok ? await hiddenUsersRes.json() : {};
+
+        const normalizedHiddenUsers: HiddenUsersMap = {};
+        Object.entries((hiddenUsersJson || {}) as Record<string, boolean>).forEach(([rawKey, enabled]) => {
+          if (!enabled) return;
+          let decodedKey = rawKey;
+          try {
+            decodedKey = decodeURIComponent(rawKey);
+          } catch {
+            decodedKey = rawKey;
+          }
+          normalizedHiddenUsers[normalizeUsername(decodedKey)] = true;
+        });
 
         if (!mounted) return;
         setBankData((runsJson || {}) as Record<string, BankRun>);
         setExclusionMap((exclusionsJson || {}) as ExclusionMap);
+        setHiddenUsersMap(normalizedHiddenUsers);
       } catch (error) {
         console.error('Failed to load bank logs:', error);
         if (!mounted) return;
         setBankData({});
         setExclusionMap({});
+        setHiddenUsersMap({});
       }
     }
 
@@ -131,7 +153,8 @@ export function useAllClanStats() {
             const donationId = `${runId}_${entryId}`;
             if (exclusionMap[donationId]) return;
 
-            const usernameKey = username.toLowerCase();
+            const usernameKey = normalizeUsername(username);
+            if (hiddenUsersMap[usernameKey]) return;
             if (isCredit) {
               donatedCreditsMap[usernameKey] = (donatedCreditsMap[usernameKey] || 0) + amount;
             } else {
@@ -143,7 +166,7 @@ export function useAllClanStats() {
         setLastUpdatedUrl(toPtBrDateTime(maxTimestamp));
 
         const mergedStats: ClanMemberStat[] = scraperData.map((scUser) => {
-          const usernameKey = scUser.username.toLowerCase();
+          const usernameKey = normalizeUsername(scUser.username);
           return {
             username: scUser.username,
             rank: scUser.rank || 'Street Cleaner',
@@ -168,7 +191,7 @@ export function useAllClanStats() {
     }
 
     fetchStats();
-  }, [scraperData, scraperLoading, bankData, exclusionMap]);
+  }, [scraperData, scraperLoading, bankData, exclusionMap, hiddenUsersMap]);
 
   return { stats, loading, lastUpdated: lastUpdatedUrl };
 }

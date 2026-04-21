@@ -5,7 +5,7 @@ import { get, ref, remove, update, set } from 'firebase/database';
 import { rtdb } from '../../lib/firebase';
 import { useAuth, type UserProfile } from '../../hooks/useAuth';
 import { useScrapedUsernames } from '../../hooks/useClanMemberData';
-import { Edit3, Trash2, Save, X, Search, UserPlus, Gift, Check, ShieldAlert, Loader2, Settings, Coins } from 'lucide-react';
+import { Edit3, Trash2, Save, X, Search, UserPlus, Gift, Check, ShieldAlert, Loader2, Settings, Coins, EyeOff, Eye } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import CasinoSettings from './CasinoSettings';
 import PowerRouletteSettings from './PowerRouletteSettings';
@@ -18,6 +18,7 @@ type DonationAuditEntry = {
   runId: string;
   entryId: string;
   username: string;
+  usernameKey: string;
   action: string;
   currency: string;
   amount: number;
@@ -25,6 +26,8 @@ type DonationAuditEntry = {
   time: string;
   ingestedAt: string;
   ingestedTs: number;
+  entryExcluded: boolean;
+  userHidden: boolean;
   excluded: boolean;
 };
 
@@ -70,6 +73,7 @@ export default function GerenciarUsuarios() {
   const [donationsLoading, setDonationsLoading] = useState(false);
   const [donationSearch, setDonationSearch] = useState('');
   const [showExcludedOnly, setShowExcludedOnly] = useState(false);
+  const [showHiddenUsers, setShowHiddenUsers] = useState(false);
 
   // --- Pagination & Sorting state ---
   const [currentPage, setCurrentPage] = useState(1);
@@ -221,16 +225,37 @@ export default function GerenciarUsuarios() {
     return Number(digits || 0);
   }
 
+  function normalizeDonationUsername(username: string): string {
+    return (username || '').trim().toLowerCase();
+  }
+
+  function donationHiddenUserKey(username: string): string {
+    return encodeURIComponent(normalizeDonationUsername(username)).replace(/\./g, '%2E');
+  }
+
   async function loadDonations() {
     setDonationsLoading(true);
     try {
-      const [runsSnap, exclusionsSnap] = await Promise.all([
+      const [runsSnap, exclusionsSnap, hiddenUsersSnap] = await Promise.all([
         get(ref(rtdb, 'clan_logs/runs')),
         get(ref(rtdb, 'config/donation_exclusions')),
+        get(ref(rtdb, 'config/donation_hidden_users')),
       ]);
 
       const runsMap = (runsSnap.val() || {}) as Record<string, any>;
       const exclusionMap = (exclusionsSnap.val() || {}) as Record<string, boolean>;
+      const hiddenUsersRaw = (hiddenUsersSnap.val() || {}) as Record<string, boolean>;
+      const hiddenUsersMap: Record<string, boolean> = {};
+      Object.entries(hiddenUsersRaw).forEach(([rawKey, enabled]) => {
+        if (!enabled) return;
+        let decoded = rawKey;
+        try {
+          decoded = decodeURIComponent(rawKey);
+        } catch {
+          decoded = rawKey;
+        }
+        hiddenUsersMap[normalizeDonationUsername(decoded)] = true;
+      });
 
       const entries: DonationAuditEntry[] = [];
       Object.entries(runsMap).forEach(([runId, runValue]) => {
@@ -249,18 +274,22 @@ export default function GerenciarUsuarios() {
           if (action !== 'give') return;
 
           const username = String(fields.username || '').trim() || 'Unknown';
+          const usernameKey = normalizeDonationUsername(username);
           const currency = String(fields.currency || '');
           const amount = parseAmountFromCurrency(currency);
           const isCredit = currency.toLowerCase().includes('credit');
           const ingestedAt = typeof entry?.ingested_at === 'string' ? entry.ingested_at : '';
           const ingestedTs = ingestedAt ? Date.parse(ingestedAt) : 0;
           const id = `${runId}_${entryId}`;
+          const entryExcluded = Boolean(exclusionMap[id]);
+          const userHidden = Boolean(hiddenUsersMap[usernameKey]);
 
           entries.push({
             id,
             runId,
             entryId,
             username,
+            usernameKey,
             action,
             currency,
             amount,
@@ -268,7 +297,9 @@ export default function GerenciarUsuarios() {
             time: String(fields.time || ''),
             ingestedAt,
             ingestedTs,
-            excluded: Boolean(exclusionMap[id]),
+            entryExcluded,
+            userHidden,
+            excluded: entryExcluded || userHidden,
           });
         });
       });
@@ -285,17 +316,50 @@ export default function GerenciarUsuarios() {
   async function toggleDonationExclusion(entry: DonationAuditEntry) {
     try {
       const targetRef = ref(rtdb, `config/donation_exclusions/${entry.id}`);
-      if (entry.excluded) {
+      if (entry.entryExcluded) {
         await remove(targetRef);
       } else {
         await set(targetRef, true);
       }
       setDonationEntries(prev => prev.map(item => (
-        item.id === entry.id ? { ...item, excluded: !item.excluded } : item
+        item.id === entry.id
+          ? {
+              ...item,
+              entryExcluded: !item.entryExcluded,
+              excluded: (!item.entryExcluded) || item.userHidden,
+            }
+          : item
       )));
     } catch (error) {
       console.error('Error toggling donation exclusion:', error);
     }
+  }
+
+  async function setDonationUserHidden(usernameKey: string, shouldHide: boolean) {
+    try {
+      const userKey = donationHiddenUserKey(usernameKey);
+      const targetRef = ref(rtdb, `config/donation_hidden_users/${userKey}`);
+      if (!shouldHide) {
+        await remove(targetRef);
+      } else {
+        await set(targetRef, true);
+      }
+      setDonationEntries(prev => prev.map(item => (
+        item.usernameKey === usernameKey
+          ? {
+              ...item,
+              userHidden: shouldHide,
+              excluded: item.entryExcluded || shouldHide,
+            }
+          : item
+      )));
+    } catch (error) {
+      console.error('Error toggling hidden donation user:', error);
+    }
+  }
+
+  async function toggleDonationUserHidden(entry: DonationAuditEntry) {
+    await setDonationUserHidden(entry.usernameKey, !entry.userHidden);
   }
 
   useEffect(() => { 
@@ -481,8 +545,19 @@ export default function GerenciarUsuarios() {
       || entry.runId.toLowerCase().includes(q);
 
     const matchesExcluded = showExcludedOnly ? entry.excluded : true;
-    return matchesSearch && matchesExcluded;
+    const matchesHidden = showHiddenUsers ? true : !entry.userHidden;
+    return matchesSearch && matchesExcluded && matchesHidden;
   });
+
+  const hiddenDonationUsers = Array.from(
+    donationEntries.reduce((acc, entry) => {
+      if (!entry.userHidden) return acc;
+      if (!acc.has(entry.usernameKey)) {
+        acc.set(entry.usernameKey, entry.username);
+      }
+      return acc;
+    }, new Map<string, string>())
+  ).sort((a, b) => a[1].localeCompare(b[1], undefined, { sensitivity: 'base' }));
 
 
   // Auto-promote superuser if needed
@@ -1067,6 +1142,18 @@ export default function GerenciarUsuarios() {
                     {showExcludedOnly ? 'Showing Excluded' : 'Show Excluded Only'}
                   </button>
                   <button
+                    onClick={() => setShowHiddenUsers(prev => !prev)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-sm text-[10px] uppercase tracking-wider border transition-colors inline-flex items-center gap-1",
+                      showHiddenUsers
+                        ? "bg-amber-900/30 text-amber-300 border-amber-900/50"
+                        : "bg-black text-stone-400 border-white/10 hover:text-white"
+                    )}
+                  >
+                    {showHiddenUsers ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                    {showHiddenUsers ? 'Showing Hidden Users' : 'Hide Hidden Users'}
+                  </button>
+                  <button
                     onClick={loadDonations}
                     className="text-xs text-stone-500 uppercase tracking-wider hover:text-white transition-colors whitespace-nowrap"
                   >
@@ -1074,6 +1161,43 @@ export default function GerenciarUsuarios() {
                   </button>
                 </div>
               </div>
+
+              {hiddenDonationUsers.length > 0 && (
+                <div className="px-6 py-4 border-b border-white/10 bg-stone-950/40">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <p className="text-[10px] uppercase tracking-widest text-red-300">
+                      Hidden Users ({hiddenDonationUsers.length})
+                    </p>
+                    <button
+                      onClick={async () => {
+                        for (const [usernameKey] of hiddenDonationUsers) {
+                          // sequential to avoid flooding RTDB with parallel writes
+                          // and to keep UI state deterministic
+                          // eslint-disable-next-line no-await-in-loop
+                          await setDonationUserHidden(usernameKey, false);
+                        }
+                      }}
+                      className="px-2 py-1 rounded-sm text-[10px] uppercase tracking-wider border border-blue-900/40 text-blue-300 bg-blue-900/10 hover:bg-blue-900/20 transition-colors"
+                    >
+                      Unhide All
+                    </button>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {hiddenDonationUsers.map(([usernameKey, displayName]) => (
+                      <button
+                        key={usernameKey}
+                        onClick={() => setDonationUserHidden(usernameKey, false)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[10px] uppercase tracking-wider border border-red-900/40 text-red-300 bg-red-900/10 hover:bg-red-900/20 transition-colors"
+                        title="Remove from hidden list"
+                      >
+                        <EyeOff className="w-3 h-3" />
+                        {displayName}
+                        <X className="w-3 h-3" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {donationsLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-4 text-blue-400">
@@ -1107,25 +1231,41 @@ export default function GerenciarUsuarios() {
                           <td className="px-6 py-3 text-center">
                             <span className={cn(
                               "inline-flex px-2 py-0.5 rounded-sm text-[10px] uppercase font-bold tracking-widest border",
-                              entry.excluded
+                              entry.userHidden
+                                ? "bg-red-950/40 text-red-400 border-red-900/50"
+                                : entry.excluded
                                 ? "bg-amber-950/30 text-amber-400 border-amber-900/50"
                                 : "bg-emerald-950/30 text-emerald-500 border-emerald-900/50"
                             )}>
-                              {entry.excluded ? 'Excluded' : 'Counting'}
+                              {entry.userHidden ? 'User Hidden' : entry.excluded ? 'Excluded' : 'Counting'}
                             </span>
                           </td>
                           <td className="px-6 py-3 text-center">
-                            <button
-                              onClick={() => toggleDonationExclusion(entry)}
-                              className={cn(
-                                "px-3 py-1.5 rounded-sm text-[10px] uppercase tracking-wider border transition-colors",
-                                entry.excluded
-                                  ? "text-emerald-400 border-emerald-900/40 bg-emerald-900/10 hover:bg-emerald-900/20"
-                                  : "text-amber-400 border-amber-900/40 bg-amber-900/10 hover:bg-amber-900/20"
-                              )}
-                            >
-                              {entry.excluded ? 'Include in Stats' : 'Exclude from Stats'}
-                            </button>
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => toggleDonationExclusion(entry)}
+                                className={cn(
+                                  "px-3 py-1.5 rounded-sm text-[10px] uppercase tracking-wider border transition-colors",
+                                  entry.entryExcluded
+                                    ? "text-emerald-400 border-emerald-900/40 bg-emerald-900/10 hover:bg-emerald-900/20"
+                                    : "text-amber-400 border-amber-900/40 bg-amber-900/10 hover:bg-amber-900/20"
+                                )}
+                              >
+                                {entry.entryExcluded ? 'Include Entry' : 'Exclude Entry'}
+                              </button>
+                              <button
+                                onClick={() => toggleDonationUserHidden(entry)}
+                                className={cn(
+                                  "px-3 py-1.5 rounded-sm text-[10px] uppercase tracking-wider border transition-colors inline-flex items-center gap-1",
+                                  entry.userHidden
+                                    ? "text-blue-300 border-blue-900/40 bg-blue-900/10 hover:bg-blue-900/20"
+                                    : "text-red-300 border-red-900/40 bg-red-900/10 hover:bg-red-900/20"
+                                )}
+                              >
+                                {entry.userHidden ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                                {entry.userHidden ? 'Show User' : 'Hide User'}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
