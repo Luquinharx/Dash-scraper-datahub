@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useCallback } from "react";
 
-const FIREBASE_RT_URL = "https://deadbb-2d5a8-default-rtdb.firebaseio.com";
+const FIREBASE_RT_URL = "https://deadclanbb-1f05e-default-rtdb.firebaseio.com";
 const REFRESH_MS = 5 * 60 * 1000;
 
 export interface ClanMemberStats {
@@ -36,6 +36,7 @@ export interface ClanMemberStats {
   dailyTSHistory: { data: string; valor: number }[];
   weeklyValues: number[];
   weeklyHistory: { semana: string; total: number }[];
+  weeklyTSHistory: { semana: string; total: number }[];
 }
 
 export function useScrapedUsernames() {
@@ -85,6 +86,7 @@ export function useClanMemberData(username: string | undefined) {
       parts.forEach(({ type, value }) => { p[type] = value; });
       const spDate = new Date(parseInt(p.year), parseInt(p.month) - 1, parseInt(p.day), parseInt(p.hour), parseInt(p.minute), parseInt(p.second));
       const adjustedDate = new Date(spDate.getTime() - 8 * 60 * 60 * 1000);
+      const adjustedTodayStr = `${adjustedDate.getFullYear()}-${String(adjustedDate.getMonth() + 1).padStart(2, '0')}-${String(adjustedDate.getDate()).padStart(2, '0')}`;
 
       const dailyDates: string[] = [];
       const shortDates: string[] = [];
@@ -102,7 +104,7 @@ export function useClanMemberData(username: string | undefined) {
 
       const requests = [
         fetch(`${FIREBASE_RT_URL}/profiles/${dbUser}.json`).then(r => r.json()),
-        fetch(`${FIREBASE_RT_URL}/daily.json?orderBy="$key"&endAt="${encodeURIComponent('"' + yesterdayStr + '"')}"&limitToLast=7`).then(r => r.json()).catch(() => null),
+        fetch(`${FIREBASE_RT_URL}/daily.json?orderBy=%22$key%22&endAt=${encodeURIComponent(`"${adjustedTodayStr}"`)}&limitToLast=90`).then(r => r.json()).catch(() => null),
         ...dailyDates.map(dateStr => fetch(`${FIREBASE_RT_URL}/daily/${dateStr}/${dbUser}.json`).then(r => r.json()).catch(() => null))
       ];
 
@@ -122,8 +124,9 @@ export function useClanMemberData(username: string | undefined) {
         const oldSnap = snaps[i];
         const newSnap = snaps[i + 1];
         
-        // Date label for the difference (if index is 7, it's today)
-        const dateLabel = i === 7 ? "Hoje" : shortDates[i + 1];
+        // Label must reflect the closed interval start date.
+        // This avoids duplicated "20/04" + "Hoje" on the same day.
+        const dateLabel = i === 7 ? "Hoje" : shortDates[i];
 
         if (oldSnap && newSnap) {
           const oldLoot = Number(oldSnap.all_time_loots) || Number(oldSnap.alltimeloot) || 0;
@@ -131,8 +134,8 @@ export function useClanMemberData(username: string | undefined) {
           const lootDiff = newLoot - oldLoot;
           dailyHistory.push({ data: dateLabel, valor: Math.max(0, lootDiff) }); 
 
-          const oldTS = Number(oldSnap.total_exp) || Number(oldSnap.alltimets) || Number(oldSnap.all_time_ts) || 0;
-          const newTS = Number(newSnap.total_exp) || Number(newSnap.alltimets) || Number(newSnap.all_time_ts) || 0;
+          const oldTS = Number(oldSnap.alltimets) || Number(oldSnap.all_time_ts) || 0;
+          const newTS = Number(newSnap.alltimets) || Number(newSnap.all_time_ts) || 0;
           const tsDiff = newTS - oldTS;
           dailyTSHistory.push({ data: dateLabel, valor: Math.max(0, tsDiff) });
         } else {
@@ -143,7 +146,7 @@ export function useClanMemberData(username: string | undefined) {
 
         // Optional: calculate local differences for graphs if needed.
       const currentAll = data.all_time_loots || 0;
-      const currentTotalExp = Number(data.total_exp) || 0;
+      const currentAllTimeTS = Number(data.alltimets) || Number(data.all_time_ts) || 0;
       const weeklyLootsUser = data.weekly_loots || 0;
       const allTimeClanLoots = data.all_time_clan_loots || 0;
 
@@ -152,17 +155,20 @@ export function useClanMemberData(username: string | undefined) {
       let baselineExp: number | null = null;
       let cardDailyLoot = 0;
       let cardDailyTS = 0;
+      let weeklyHistory: { semana: string; total: number }[] = [];
+      let weeklyTSHistory: { semana: string; total: number }[] = [];
 
       if (allDailyData) {
         const allDailyDates = Object.keys(allDailyData).sort().filter(d => d <= yesterdayStr);
+        const allDailyDatesWithToday = Object.keys(allDailyData).sort().filter(d => d <= adjustedTodayStr);
         for (let i = allDailyDates.length - 1; i >= 0; i--) {
             const snap = allDailyData[allDailyDates[i]]?.[dbUser] || allDailyData[allDailyDates[i]]?.[username];
             if (snap) {
-                if (baselineLoot === null) {
+              if (baselineLoot === null) {
                     baselineLoot = snap.alltimeloot !== undefined ? Number(snap.alltimeloot) : (snap.all_time_loots !== undefined ? Number(snap.all_time_loots) : null);
                 }
                 if (baselineExp === null) {
-                    const snapExp = snap.total_exp !== undefined ? Number(snap.total_exp) : (snap.alltimets !== undefined ? Number(snap.alltimets) : (snap.all_time_ts !== undefined ? Number(snap.all_time_ts) : null));
+                    const snapExp = snap.alltimets !== undefined ? Number(snap.alltimets) : (snap.all_time_ts !== undefined ? Number(snap.all_time_ts) : null);
                     if (snapExp !== null) {
                         baselineExp = snapExp;
                     }
@@ -172,15 +178,84 @@ export function useClanMemberData(username: string | undefined) {
                 }
             }
         }
+
+        // Build weekly history from daily snapshots + current live profile (adjusted by 08:00 reset window)
+        const parseLoot = (snap: any) => Number(snap?.alltimeloot ?? snap?.all_time_loots ?? 0);
+        const parseTS = (snap: any) => Number(snap?.alltimets ?? snap?.all_time_ts ?? 0);
+        const toWeekStart = (dateStr: string) => {
+          const [y, m, d] = dateStr.split('-').map(Number);
+          const date = new Date(y, m - 1, d);
+          const weekDay = (date.getDay() + 6) % 7; // Monday = 0
+          date.setDate(date.getDate() - weekDay);
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        };
+
+        const userDailySnapshots = allDailyDatesWithToday
+          .map((date) => {
+            const snap = allDailyData[date]?.[dbUser] || allDailyData[date]?.[username];
+            if (!snap) return null;
+            return { date, loot: parseLoot(snap), ts: parseTS(snap) };
+          })
+          .filter((snap): snap is { date: string; loot: number; ts: number } => snap !== null);
+
+        const dailyIntervals: { date: string; loot: number; ts: number }[] = [];
+        for (let i = 0; i < userDailySnapshots.length - 1; i++) {
+          const oldSnap = userDailySnapshots[i];
+          const newSnap = userDailySnapshots[i + 1];
+          dailyIntervals.push({
+            date: oldSnap.date,
+            loot: Math.max(0, newSnap.loot - oldSnap.loot),
+            ts: Math.max(0, newSnap.ts - oldSnap.ts),
+          });
+        }
+
+        if (userDailySnapshots.length > 0) {
+          const latestSnap = userDailySnapshots[userDailySnapshots.length - 1];
+          dailyIntervals.push({
+            date: adjustedTodayStr,
+            loot: Math.max(0, currentAll - latestSnap.loot),
+            ts: Math.max(0, currentAllTimeTS - latestSnap.ts),
+          });
+        }
+
+        const lootByWeek = new Map<string, number>();
+        const tsByWeek = new Map<string, number>();
+        dailyIntervals.forEach((interval) => {
+          const weekStart = toWeekStart(interval.date);
+          lootByWeek.set(weekStart, (lootByWeek.get(weekStart) || 0) + interval.loot);
+          tsByWeek.set(weekStart, (tsByWeek.get(weekStart) || 0) + interval.ts);
+        });
+
+        const sortedWeeks = Array.from(lootByWeek.keys()).sort().slice(-8);
+        weeklyHistory = sortedWeeks.map((weekStart) => {
+          const [, mm, dd] = weekStart.split('-');
+          return {
+            semana: `${dd}/${mm}`,
+            total: Math.round(lootByWeek.get(weekStart) || 0),
+          };
+        });
+        weeklyTSHistory = sortedWeeks.map((weekStart) => {
+          const [, mm, dd] = weekStart.split('-');
+          return {
+            semana: `${dd}/${mm}`,
+            total: Math.round(tsByWeek.get(weekStart) || 0),
+          };
+        });
       } else {
         // Fallback se nÃ£o conseguiu baixar daily.json completo
         const todaySnap = snaps[7];
         baselineLoot = todaySnap ? (Number(todaySnap.alltimeloot) || Number(todaySnap.all_time_loots) || 0) : currentAll;
-        baselineExp = todaySnap ? (Number(todaySnap.total_exp) || Number(todaySnap.all_time_ts) || currentTotalExp) : currentTotalExp;
+        baselineExp = todaySnap ? (Number(todaySnap.alltimets) || Number(todaySnap.all_time_ts) || currentAllTimeTS) : currentAllTimeTS;
       }
 
       if (baselineLoot !== null) cardDailyLoot = Math.max(0, currentAll - baselineLoot);
-      if (baselineExp !== null) cardDailyTS = Math.max(0, currentTotalExp - baselineExp);
+      if (baselineExp !== null) cardDailyTS = Math.max(0, currentAllTimeTS - baselineExp);
+      if (weeklyHistory.length === 0) {
+        weeklyHistory = [{ semana: "Atual", total: weeklyLootsUser }];
+      }
+      if (weeklyTSHistory.length === 0) {
+        weeklyTSHistory = [{ semana: "Atual", total: Number(data.weekly_ts || 0) }];
+      }
 
       setStats({
         ...data,
@@ -192,7 +267,8 @@ export function useClanMemberData(username: string | undefined) {
         dailyHistory,
         dailyTSHistory,
         weeklyValues: [weeklyLootsUser],
-        weeklyHistory: [{ semana: "Current", total: weeklyLootsUser }]
+        weeklyHistory,
+        weeklyTSHistory
       });
     } catch (err) {
       console.error("Error fetching clan member data:", err);

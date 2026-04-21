@@ -60,7 +60,7 @@ export default function Dashboard() {
   }, [data]);
 
   const filteredAndSortedData = useMemo(() => {
-    let result = dedupedData.filter(r => r.username.toLowerCase().includes(search.toLowerCase()));
+    let result = dedupedData.filter(r => (r.username || '').toLowerCase().includes(search.toLowerCase()));
 
     if (filterMode === 'active') {
       result = result.filter(r => r.isActive);
@@ -70,8 +70,8 @@ export default function Dashboard() {
 
     result.sort((a, b) => {
       let av: number | string = 0, bv: number | string = 0;
-      const profileA = profiles.find(p => p.username.toLowerCase() === a.username.toLowerCase());
-      const profileB = profiles.find(p => p.username.toLowerCase() === b.username.toLowerCase());
+      const profileA = profiles.find(p => (p.username || '').toLowerCase() === (a.username || '').toLowerCase());
+      const profileB = profiles.find(p => (p.username || '').toLowerCase() === (b.username || '').toLowerCase());
       
       const aSortKeyStr = String(sortKey);
       
@@ -319,7 +319,7 @@ export default function Dashboard() {
               <tbody className="divide-y divide-white/5 font-mono">
                 {paginatedData.map((r, idx) => {
                   const absoluteIdx = (currentPage - 1) * itemsPerPage + idx;
-                  const profile = profiles.find((p) => p.username.toLowerCase() === r.username.toLowerCase());
+                  const profile = profiles.find((p) => (p.username || '').toLowerCase() === (r.username || '').toLowerCase());
                   
                   const username = r.username;
                   const rank = r.rank;

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { onValue, ref, set } from 'firebase/database';
+import { rtdb } from '../lib/firebase';
 
 export interface PowerRoulettePrize {
   id: number;
@@ -51,9 +51,10 @@ export function usePowerRouletteConfig() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'config', 'power_casino'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data() as PowerRouletteConfig;
+    const configRef = ref(rtdb, 'config/power_casino');
+    const unsub = onValue(configRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val() as PowerRouletteConfig;
 
         let loadedPrizes = data.prizes || defaultPowerRouletteConfig.prizes;
         // Force transition to English names
@@ -75,7 +76,7 @@ export function usePowerRouletteConfig() {
         });
         if (loadedPrizes.length > 0 && loadedPrizes[0].chance === 50 && loadedPrizes[0].name.includes('100k')) {
             loadedPrizes = defaultPowerRouletteConfig.prizes; // Auto-update to new 49% default
-            setDoc(doc(db, 'config', 'power_casino'), { ...data, prizes: loadedPrizes }, { merge: true });
+            void set(configRef, { ...data, prizes: loadedPrizes });
         }
 
         setConfig({
@@ -95,7 +96,7 @@ export function usePowerRouletteConfig() {
 
   const updateConfig = async (newConfig: PowerRouletteConfig) => {
     try {
-      await setDoc(doc(db, 'config', 'power_casino'), newConfig);
+      await set(ref(rtdb, 'config/power_casino'), newConfig);
     } catch (e) {
       console.error("Failed to save power_casino config", e);
       throw e;

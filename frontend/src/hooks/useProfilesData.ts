@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-const FIREBASE_PROFILES_URL = "https://deadbb-2d5a8-default-rtdb.firebaseio.com/profiles.json";
+const FIREBASE_PROFILES_URL = "https://deadclanbb-1f05e-default-rtdb.firebaseio.com/profiles.json";
 
 export interface MemberProfile {
   username: string;
@@ -52,7 +52,54 @@ export function useProfilesData() {
           return;
         }
 
-        const parsedProfiles: MemberProfile[] = Object.values(data);
+        const toNumber = (value: unknown) => Number(value || 0);
+        const toStringValue = (value: unknown) => (typeof value === 'string' ? value : '');
+
+        const parsedProfiles: MemberProfile[] = Object.entries(data)
+          .map(([rawKey, rawValue]) => {
+            if (!rawValue || typeof rawValue !== 'object') return null;
+
+            const item = rawValue as Record<string, unknown>;
+            let username = toStringValue(item.username).trim();
+
+            // Some snapshots may miss username in value; use RTDB key as fallback.
+            if (!username) {
+              try {
+                username = decodeURIComponent(rawKey);
+              } catch {
+                username = rawKey;
+              }
+            }
+
+            if (!username) return null;
+
+            return {
+              username,
+              collected_at: toStringValue(item.collected_at),
+              weekly_ts: toNumber(item.weekly_ts),
+              clan_weekly_ts: toNumber(item.clan_weekly_ts),
+              exp_since_death: toNumber(item.exp_since_death),
+              all_time_ts: toNumber(item.all_time_ts),
+              daily_ts_calc: toNumber(item.daily_ts_calc),
+              total_exp: toNumber(item.total_exp),
+              expected_loss_on_death: toNumber(item.expected_loss_on_death),
+              daily_tpk: toNumber(item.daily_tpk),
+              weekly_tpk: toNumber(item.weekly_tpk),
+              clan_weekly_tpk: toNumber(item.clan_weekly_tpk),
+              all_time_tpk: toNumber(item.all_time_tpk),
+              last_players_killed: toStringValue(item.last_players_killed),
+              last_hit_by: toStringValue(item.last_hit_by),
+              weekly_loots: toNumber(item.weekly_loots),
+              all_time_loots: toNumber(item.all_time_loots),
+              clan_weekly_loots: toNumber(item.clan_weekly_loots),
+              all_time_clan_loots: toNumber(item.all_time_clan_loots),
+              last_clan_join: toStringValue(item.last_clan_join),
+              rank: toStringValue(item.rank),
+              rank_score: toNumber(item.rank_score),
+            } as MemberProfile;
+          })
+          .filter((item): item is MemberProfile => item !== null);
+
         setProfiles(parsedProfiles);
       } catch (error) {
         console.error('Failed to fetch profiles:', error);

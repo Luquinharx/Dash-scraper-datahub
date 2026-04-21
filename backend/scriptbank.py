@@ -14,39 +14,11 @@ from selenium.webdriver.firefox.service import Service as FirefoxService
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-# Helpers de ambiente para evitar credenciais hardcoded no repositorio
-def env_bool(name, default):
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return str(raw).strip().lower() in ("1", "true", "yes", "on")
-
-
-def env_int(name, default):
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        return int(raw)
-    except Exception:
-        return default
-
-
-def env_float(name, default):
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        return float(raw)
-    except Exception:
-        return default
-
-
 # --- CONFIGURACAO ---
-USUARIO = os.getenv("DF_USER", "").strip()
-SENHA = os.getenv("DF_PASS", "").strip()
-URL_STORAGE_LOG = os.getenv("DF_BANK_LOG_URL", "https://fairview.deadfrontier.com/onlinezombiemmo/index.php?page=89").strip()
-FIREBASE_BASE_URL = os.getenv("FIREBASE_BASE_URL", "https://deadclanbb-1f05e-default-rtdb.firebaseio.com/").strip()
+USUARIO = "logbb"
+SENHA = "leoleobr3"
+URL_STORAGE_LOG = "https://fairview.deadfrontier.com/onlinezombiemmo/index.php?page=89"
+FIREBASE_BASE_URL = "https://deadclanbb-1f05e-default-rtdb.firebaseio.com/"
 
 TAB_KEY = "bank"
 TAB_LABEL = "Bank"
@@ -54,12 +26,12 @@ FIREBASE_BATCH_SIZE = 100
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(SCRIPT_DIR, "clan_bank_state.json")
 SUMMARY_FILE = os.path.join(SCRIPT_DIR, "clan_logs_summary.json")
-HEADLESS = env_bool("BANK_HEADLESS", True)  # Deixe como True pois a VPS nao tem tela
-INTERVALO_HORAS = env_float("BANK_INTERVAL_HOURS", 1)
-RETRY_INICIAL_SEGUNDOS = env_int("BANK_RETRY_INITIAL_SECONDS", 60)
-MAX_TENTATIVAS_COLETA = env_int("BANK_MAX_ATTEMPTS", 3)
-RETRY_FALHA_COLETA_SEGUNDOS = env_int("BANK_RETRY_ATTEMPT_SECONDS", 30)
-SELENIUM_COMMAND_TIMEOUT_SEGUNDOS = env_int("BANK_SELENIUM_TIMEOUT_SECONDS", 300)
+HEADLESS = True # Deixe como True pois a VPS não tem tela
+INTERVALO_HORAS = 1
+RETRY_INICIAL_SEGUNDOS = 60
+MAX_TENTATIVAS_COLETA = 3
+RETRY_FALHA_COLETA_SEGUNDOS = 30
+SELENIUM_COMMAND_TIMEOUT_SEGUNDOS = 300
 # --------------------
 
 
@@ -359,8 +331,6 @@ def executar_scraper_bank():
             time.sleep(2)
 
             if "Logout" not in driver.page_source:
-                if not USUARIO or not SENHA:
-                    raise RuntimeError("Credenciais ausentes: defina DF_USER e DF_PASS no ambiente.")
                 try:
                     user_field = driver.find_element(By.CSS_SELECTOR, "#frmLogin input[name='user']")
                     pass_field = driver.find_element(By.CSS_SELECTOR, "#frmLogin input[name='passwrd']")

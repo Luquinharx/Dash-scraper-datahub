@@ -103,4 +103,26 @@ O scraper roda **a cada hora** (minuto 02) e salva os dados no Firebase:
 
 | Variável         | Descrição                        | Padrão                                                      |
 |------------------|----------------------------------|-------------------------------------------------------------|
-| `FIREBASE_DB_URL`| URL do Firebase Realtime Database| `https://deadbb-2d5a8-default-rtdb.firebaseio.com/`         |
+| `FIREBASE_DB_URL`| URL do Firebase Realtime Database| `https://deadclanbb-1f05e-default-rtdb.firebaseio.com/`         |
+
+## Migração Firestore -> Realtime DB
+
+No frontend, existe um script para migrar `usuarios` e `config` do projeto antigo (`deadbb-2d5a8`) para o RTDB novo (`deadclanbb-1f05e`):
+
+```bash
+cd frontend
+npm run migrate:firestore-to-rtdb
+```
+
+Sem credenciais, ele roda em modo export-only e gera:
+
+`frontend/scripts/migration_export.json`
+
+Para gravar no RTDB novo, execute com um usuário autenticável no projeto novo:
+
+```bash
+cd frontend
+$env:MIGRATION_EMAIL="seu-admin@email.com"
+$env:MIGRATION_PASSWORD="sua_senha"
+npm run migrate:firestore-to-rtdb
+```

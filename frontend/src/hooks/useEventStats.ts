@@ -16,7 +16,7 @@ export function useEventStats() {
   const [bankData, setBankData] = useState<any>(null);
 
   useEffect(() => {
-    fetch("https://deadbb-2d5a8-default-rtdb.firebaseio.com/clan_logs/runs.json")
+    fetch("https://deadclanbb-1f05e-default-rtdb.firebaseio.com/clan_logs/runs.json")
       .then(res => res.json())
       .then(setBankData)
       .catch(console.error);

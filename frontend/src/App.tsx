@@ -6,7 +6,6 @@ import Dashboard from './components/Dashboard';
 import Login from './components/pages/Login';
 import DashboardUser from './components/pages/DashboardUser';
 import Estatisticas from './components/pages/Estatisticas';
-import Evento from './components/pages/Evento';
 import EstatisticasTS from './components/pages/EstatisticasTS';
 import Cassino from './components/pages/Cassino';
 import Perfil from './components/pages/Perfil';
@@ -30,7 +29,6 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/estatisticas" element={<PublicLayout><Estatisticas /></PublicLayout>} />
-          <Route path="/evento" element={<PublicLayout><Evento /></PublicLayout>} />
           <Route path="/dashboard-ts" element={<PublicLayout><EstatisticasTS /></PublicLayout>} />
           <Route path="/dashboard-loot" element={<PublicLayout><Dashboard /></PublicLayout>} />
           <Route path="/dashboard" element={<PublicLayout><DashboardUser /></PublicLayout>} />

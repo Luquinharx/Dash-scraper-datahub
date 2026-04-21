@@ -1,5 +1,5 @@
-import { doc, updateDoc, setDoc } from 'firebase/firestore';
-import { db } from './src/lib/firebase';
+import { get, ref, set, update } from 'firebase/database';
+import { rtdb } from './src/lib/firebase';
 const prizes = [
     { id: 1, name: 'Normal (100k)', chance: 49, value: '100k', color: 'text-amber-500', icon: '??' },
     { id: 2, name: 'Rara (250k)', chance: 25, value: '250k', color: 'text-emerald-500', icon: '??' },
@@ -9,8 +9,10 @@ const prizes = [
 ];
 
 async function run() {
-    try { await updateDoc(doc(db, 'config', 'casino'), { prizes }); } catch { await setDoc(doc(db, 'config', 'casino'), { prizes }, {merge:true}); }
-    try { await updateDoc(doc(db, 'config', 'power_casino'), { prizes }); } catch { await setDoc(doc(db, 'config', 'power_casino'), { prizes }, {merge:true}); }
+    const casinoRef = ref(rtdb, 'config/casino');
+    const powerRef = ref(rtdb, 'config/power_casino');
+    if ((await get(casinoRef)).exists()) await update(casinoRef, { prizes }); else await set(casinoRef, { prizes });
+    if ((await get(powerRef)).exists()) await update(powerRef, { prizes }); else await set(powerRef, { prizes });
     console.log('Firebase updated successfully!');
     process.exit(0);
 }

@@ -35,7 +35,7 @@ export default function EstatisticasTS() {
   }
 
   const [search, setSearch] = useState('');
-  const [filterMode, setFilterMode] = useState<'all' | 'active' | 'inactive'>('active');
+  const [filterMode, setFilterMode] = useState<'all' | 'active' | 'inactive'>('all');
   const [sortKey, setSortKey] = useState<SortKey>('all_time_ts');
   const [sortDesc, setSortDesc] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);

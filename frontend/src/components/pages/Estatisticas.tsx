@@ -19,12 +19,8 @@ export default function Estatisticas() {
     );
   }
 
-  // Users to exclude from donation stats
-  const excludedUsers = ['porkchopo', 'oinkmeats', 'SGT EASY PICKINS', 'MGS Green Cake', 'MGS Green Haze'];
-  
   // Separate valid stats and order them appropriately. We can have two sections or tables.
   const donationStats = [...stats]
-    .filter(s => !excludedUsers.includes(s.username))
       .sort((a, b) => b.donatedCash - a.donatedCash)
       .filter(s => s.donatedCash > 0 || s.donatedCredits > 0);
 

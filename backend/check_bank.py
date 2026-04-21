@@ -1,40 +1,55 @@
-import requests
+﻿import requests
 from datetime import datetime
 
-r = requests.get('https://deadbb-2d5a8-default-rtdb.firebaseio.com/clan_logs/runs.json')
-data = r.json()
+TIME_FORMATS = [
+    "%d/%m/%Y %H:%M:%S",
+    "%d/%m/%Y %H:%M",
+    "%m/%d/%Y %I:%M %p",
+    "%m/%d/%Y %I:%M:%S %p",
+]
+
+
+def parse_time_str(t_str: str) -> datetime | None:
+    clean = t_str.strip()
+    for fmt in TIME_FORMATS:
+        try:
+            return datetime.strptime(clean, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+response = requests.get(
+    "https://deadclanbb-1f05e-default-rtdb.firebaseio.com/clan_logs/runs.json",
+    timeout=20,
+)
+response.raise_for_status()
+data = response.json() or {}
 
 max_date = None
 max_time_str = "Nenhum dado"
 
-if data:
-    for run_key, run in data.items():
-        if run and 'bank' in run:
-            bank_data = run['bank']
-            if isinstance(bank_data, dict):
-                iterator = bank_data.values()
-            elif isinstance(bank_data, list):
-                iterator = [item for item in bank_data if isinstance(item, dict)]
-            else:
-                continue
-                
-            for doc in iterator:
-                fields = doc.get('fields', {})
-                if 'time' in fields:
-                    t_str = fields['time']
-                    try:
-                        print("Encontrado:", t_str)
-                        # O formato pode variar, vamos ver como ele é
-                        if len(t_str.split()) > 1:
-                            date_part, time_part = t_str.split(' ', 1)
-                            d, m, y = map(int, date_part.split('/'))
-                            H, M, S = map(int, time_part.split(':'))
-                            dt = datetime(y, m, d, H, M, S)
-                            
-                            if not max_date or dt > max_date:
-                                max_date = dt
-                                max_time_str = t_str
-                    except Exception as e:
-                        print(f"Erro em {t_str}: {e}")
+for run in data.values():
+    if not run or "bank" not in run:
+        continue
 
-print("Ultima coleta de doação no banco:", max_time_str)
+    bank_data = run["bank"]
+    if isinstance(bank_data, dict):
+        iterator = bank_data.values()
+    elif isinstance(bank_data, list):
+        iterator = [item for item in bank_data if isinstance(item, dict)]
+    else:
+        continue
+
+    for doc in iterator:
+        fields = doc.get("fields", {})
+        t_str = fields.get("time")
+        if not t_str:
+            continue
+
+        dt = parse_time_str(str(t_str))
+        if dt and (max_date is None or dt > max_date):
+            max_date = dt
+            max_time_str = str(t_str)
+
+print("Ultima coleta de doacao no banco:", max_time_str)

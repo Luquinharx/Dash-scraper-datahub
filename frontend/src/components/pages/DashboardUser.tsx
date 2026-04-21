@@ -50,7 +50,8 @@ export default function DashboardUser() {
           return p.username.toLowerCase() === selectedNickJogo?.toLowerCase();
        }
     });
-  const girosDisponiveis = stats ? Math.floor(((stats.weeklyToDate || memberTSData?.weekly_loots || 0) || 0) / 5000) : 0;
+  const clanWeeklyLoot = Number(stats?.clan_weekly_loots || memberTSData?.clan_weekly_loots || 0);
+  const girosDisponiveis = clanWeeklyLoot >= 5000 ? 1 : 0;
 
   // Calculo Unificado de Loot
   const dbClanLoot = firestoreData.baseLoot || 0;
@@ -313,7 +314,7 @@ Total = ${collateralTotal.toLocaleString('pt-BR')}`;
                   <h2 className="text-lg font-serif font-bold text-stone-300 mb-6 uppercase tracking-wider">TS Weekly Summary</h2>
                   <div className="flex items-center justify-center h-[300px] bg-black rounded">
                     <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={[{ semana: "Current", total: memberTSData.weekly_ts }]}>
+                      <BarChart data={stats.weeklyTSHistory && stats.weeklyTSHistory.length > 0 ? stats.weeklyTSHistory : [{ semana: "Atual", total: memberTSData.weekly_ts }]}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#1c1917" />
                         <XAxis dataKey="semana" stroke="#44403c" tick={{ fontSize: 10, fontFamily: 'monospace' }} />
                         <YAxis stroke="#44403c" tick={{ fontSize: 10, fontFamily: 'monospace' }} />
@@ -394,4 +395,3 @@ Total = ${collateralTotal.toLocaleString('pt-BR')}`;
     </div>
   );
 }
-

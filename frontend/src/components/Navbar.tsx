@@ -20,7 +20,6 @@ export default function Navbar() {
     { to: '/dashboard-loot', label: 'Dash Loot', icon: BarChart3 },
     { to: '/dashboard-ts', label: 'Dash TS', icon: Activity },
     { to: '/estatisticas', label: 'Statistics', icon: Table },
-    { to: '/evento', label: 'Evento', icon: Gift },
     { to: '/dashboard', label: 'Dash Member', icon: LayoutDashboard },
   ];
 

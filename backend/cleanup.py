@@ -4,7 +4,7 @@ import logging
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-FIREBASE_DB_URL = "https://deadbb-2d5a8-default-rtdb.firebaseio.com/"
+FIREBASE_DB_URL = "https://deadclanbb-1f05e-default-rtdb.firebaseio.com/"
 
 def clean_old_firebase_data(keep_days=14):
     """

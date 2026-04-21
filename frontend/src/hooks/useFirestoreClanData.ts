@@ -7,27 +7,42 @@ export interface FirestoreClanData {
   donatedCredits: number;
 }
 
+const FIREBASE_RT_URL = "https://deadclanbb-1f05e-default-rtdb.firebaseio.com";
+
+type ProfileRecord = {
+  username?: string;
+  all_time_clan_loots?: number;
+  last_clan_join?: string;
+};
+
 export function useFirestoreClanData(username: string | undefined) {
   const [data, setData] = useState<FirestoreClanData>({ joinDate: null, baseLoot: 0, donatedCash: 0, donatedCredits: 0 });
   const [loading, setLoading] = useState(true);
   const [logsData, setLogsData] = useState<any>(null);
-  const [profilesData, setProfilesData] = useState<any>(null);
+  const [profilesData, setProfilesData] = useState<Record<string, ProfileRecord> | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     Promise.all([
-      fetch("https://deadbb-2d5a8-default-rtdb.firebaseio.com/clan_logs/runs.json").then(r => r.json()).catch(() => null),
-      fetch("https://deadbb-2d5a8-default-rtdb.firebaseio.com/clan_member_profiles.json").then(r => r.json()).catch(() => null)
+      fetch(`${FIREBASE_RT_URL}/clan_logs/runs.json`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`${FIREBASE_RT_URL}/profiles.json`).then(r => r.ok ? r.json() : null).catch(() => null)
     ]).then(([logs, profiles]) => {
+      if (cancelled) return;
       setLogsData(logs);
-      setProfilesData(profiles);
+      setProfilesData(profiles && typeof profiles === 'object' ? profiles : null);
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
     async function fetchData() {
-      if (!username || !logsData || !profilesData) {
+      if (!username || !logsData) {
         setData({ joinDate: null, baseLoot: 0, donatedCash: 0, donatedCredits: 0 });
-        setLoading(!logsData || !profilesData);
+        setLoading(!logsData);
         return;
       }
 
@@ -44,22 +59,19 @@ export function useFirestoreClanData(username: string | undefined) {
         let joinDate: Date | null = null;
         let baseLoot = 0;
 
-        if (profilesData && profilesData['2166'] && profilesData['2166'].users) {
-          const users = Object.values(profilesData['2166'].users) as any[];
-          for (const user of users) {
-             if (user.username && user.username.toLowerCase().trim() === uLower) {
-                if (user.dfprofiler) {
-                   baseLoot = Number(user.dfprofiler.all_time_clan_loots) || 0;
-                   const rawJoinDate = user.dfprofiler.last_clan_join;
-                   if (rawJoinDate) {
-                       let parsedDate = new Date(rawJoinDate);
-                       if (!isNaN(parsedDate.getTime())) {
-                           joinDate = parsedDate;
-                       }
-                   }
-                }
-                break;
-             }
+        if (profilesData) {
+          const userProfile = Object.values(profilesData).find((profile) =>
+            profile?.username?.toLowerCase().trim() === uLower
+          );
+
+          if (userProfile) {
+            baseLoot = Number(userProfile.all_time_clan_loots) || 0;
+            if (userProfile.last_clan_join) {
+              const parsedDate = new Date(userProfile.last_clan_join);
+              if (!isNaN(parsedDate.getTime())) {
+                joinDate = parsedDate;
+              }
+            }
           }
         }
 
@@ -85,7 +97,7 @@ export function useFirestoreClanData(username: string | undefined) {
         Object.values(allLogs).forEach(fields => {
           if (fields.action === 'give' && fields.username && fields.username.toLowerCase().trim() === uLower) {
             const curr = (fields.currency || '').toLowerCase();
-            let amountStr = curr.replace(/[^0-9]/g, '');
+            const amountStr = curr.replace(/[^0-9]/g, '');
             const amount = Number(amountStr) || 0;
             if (curr.includes('credit')) {
               donatedCredits += amount;

@@ -3,10 +3,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useClanMemberData } from '../../hooks/useClanMemberData';
 import { useCasinoConfig } from '../../hooks/useCasinoConfig';
-import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, addDoc, Timestamp, updateDoc, doc, increment } from 'firebase/firestore';
+import { get, push, ref, runTransaction } from 'firebase/database';
+import { rtdb } from '../../lib/firebase';
 import { Gift } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { formatDatePtBR, toMillis } from '../../lib/date';
 
 export default function Roleta() {
   const { profile, refreshProfile } = useAuth();
@@ -34,59 +35,46 @@ export default function Roleta() {
     startOfPrizeWeek.setDate(now.getDate() - daysToSubtract);
     startOfPrizeWeek.setHours(7, 53, 0, 0);
 
-      const nextSpinDate = new Date(startOfPrizeWeek);
-      nextSpinDate.setDate(nextSpinDate.getDate() + 7);
-      const nextSpinStr = `${String(nextSpinDate.getDate()).padStart(2, '0')}/${String(nextSpinDate.getMonth() + 1).padStart(2, '0')} - 07:53`;
-
-      return {
-         startOfPrizeWeek,
-         nextSpinStr,
-         lootWeekLabel: `Week of ${startOfPrizeWeek.getDate()}/${startOfPrizeWeek.getMonth()+1}`
-      };
+      return { startOfPrizeWeek };
     }, []);
 
-    const { startOfPrizeWeek, nextSpinStr } = getPreviousWeekRange();
+    const { startOfPrizeWeek } = getPreviousWeekRange();
+    const clanWeeklyLoot = Number(stats?.clan_weekly_loots || 0);
 
-    const lootReference = (stats?.weeklyValues && stats.weeklyValues.length >= 2)
-      ? stats.weeklyValues[stats.weeklyValues.length - 2] 
-      : 0;
-
-  // Rule: Score at least 5k loots to qualify. Max 1 spin per week.
-  const isQualified = lootReference >= 5000;
+  // Rule: Score at least 5k clan weekly loots to qualify. Max 1 spin per week.
+  const isQualified = clanWeeklyLoot >= 5000;
   const weeklyTotal = isQualified ? 1 : 0; // Quantos giros semanais (gr├ítis) s├úo poss├¡veis
   const extraSpins = profile?.extraSpins || 0; // Giros manuais extras
 
   // carregar giros j├í usados NESTA semana de premia├º├úo
   useEffect(() => {
     if (!profile?.userId) return;
+    const userId = profile.userId;
     async function load() {
       try {
-        const q = query(
-            collection(db, 'roletas'), 
-            where('userId', '==', profile!.userId)
-        );
-        const snap = await getDocs(q);
-        
+        const snap = await get(ref(rtdb, 'roletas'));
+        const roletasData = (snap.val() || {}) as Record<string, { userId?: string; premio?: string; data?: unknown; entregue?: boolean }>;
+
         let count = 0;
         const list: { premio: string; data: string; entregue: boolean }[] = [];
         const startTs = startOfPrizeWeek.getTime();
 
-        snap.forEach(d => {
-          const data = d.data();
-          const dataDate = data.data?.toDate?.();
-          
-          if (dataDate && dataDate.getTime() >= startTs) {
-             count++;
+        Object.values(roletasData).forEach((entry) => {
+          if (entry.userId !== userId) return;
+          const dataMillis = toMillis(entry.data);
+
+          if (dataMillis >= startTs) {
+            count++;
           }
 
           list.push({
-            premio: data.premio,
-            data: dataDate ? dataDate.toLocaleDateString('pt-BR') : String(data.data),
-            entregue: !!data.entregue,
+            premio: entry.premio || '-',
+            data: formatDatePtBR(entry.data),
+            entregue: !!entry.entregue,
           });
         });
 
-        list.reverse(); 
+        list.reverse();
 
         setGirosUsados(count);
         setHistorico(list);
@@ -100,11 +88,8 @@ export default function Roleta() {
     const girosRestantesSemanais = Math.max(0, weeklyTotal - girosUsados);
     const girosDisponiveis = Math.min(3, girosRestantesSemanais + extraSpins);
 
-    const now = new Date();
-    const isMondayMorning = now.getDay() === 1 && now.getHours() < 12;
-
     const girar = useCallback(async () => {
-      if (spinning || girosDisponiveis <= 0 || !profile?.userId || !isMondayMorning) return;
+      if (spinning || girosDisponiveis <= 0 || !profile?.userId) return;
     setSpinning(true);
     setResult(null);
     setSlots(['🩸', '🩸', '🩸']);
@@ -137,20 +122,21 @@ export default function Roleta() {
     // Set final slots to winner icon
     setSlots([selected.icon, selected.icon, selected.icon]);
 
-    // Save to Firestore
+    // Save to Realtime Database
     try {
-      await addDoc(collection(db, 'roletas'), {
+      await push(ref(rtdb, 'roletas'), {
         userId: profile.userId,
         premio: selected.name,
-        data: Timestamp.now(),
+        data: Date.now(),
         entregue: false,
       });
 
-      // Se usou um giro extra (porque n├úo tinha mais semanais ou n├úo era qualificado), debitar
+      // Se usou um giro extra (porque nao tinha mais semanais ou nao era qualificado), debitar
       const hasWeeklyAvailable = weeklyTotal > girosUsados;
       if (!hasWeeklyAvailable && extraSpins > 0) {
-        await updateDoc(doc(db, 'usuarios', profile.userId), {
-            extraSpins: increment(-1)
+        await runTransaction(ref(rtdb, `usuarios/${profile.userId}/extraSpins`), (current) => {
+          const nowValue = Number(current || 0);
+          return nowValue > 0 ? nowValue - 1 : 0;
         });
       }
 
@@ -178,7 +164,7 @@ export default function Roleta() {
                 <span className="text-red-600">Blood</span> Slot
               </h1>
               <p className="text-stone-500 text-sm font-serif tracking-wide uppercase mt-1">
-                One spin per week ÔÇó Qualification: 5k+ Loot
+                One spin per week ÔÇó Qualification: 5k+ Clan Weekly Loot
               </p>
             </div>
           </div>
@@ -188,9 +174,9 @@ export default function Roleta() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-black border border-white/10 rounded-sm p-6 text-center shadow-lg relative overflow-hidden group">
             <div className="absolute top-0 left-0 w-1 h-full bg-red-900/50"></div>
-            <p className="text-xs text-stone-500 uppercase tracking-widest font-serif">Last Week Loot</p>
+            <p className="text-xs text-stone-500 uppercase tracking-widest font-serif">Clan Weekly Loot</p>
             <p className="text-3xl font-serif font-bold text-white mt-2 drop-shadow-md group-hover:text-red-500 transition-colors">
-                {lootReference.toLocaleString('pt-BR')}
+                {clanWeeklyLoot.toLocaleString('pt-BR')}
             </p>
           </div>
           
@@ -218,9 +204,9 @@ export default function Roleta() {
 
           <div className="bg-black border border-white/10 rounded-sm p-6 text-center shadow-lg relative overflow-hidden group">
             <div className="absolute top-0 left-0 w-1 h-full bg-red-900/50"></div>
-            <p className="text-xs text-stone-500 uppercase tracking-widest font-serif">Next Spin</p>
+            <p className="text-xs text-stone-500 uppercase tracking-widest font-serif">Goal</p>
             <p className="text-2xl font-serif font-bold text-stone-300 mt-2 drop-shadow-md">
-                {nextSpinStr}
+                5,000
             </p>
           </div>
         </div>
@@ -260,12 +246,12 @@ export default function Roleta() {
                   "relative z-10 px-12 py-5 rounded-sm font-serif font-black text-2xl uppercase tracking-[0.2em] shadow-2xl transform transition-all active:scale-95 border border-white/10",
                   spinning
                     ? "bg-stone-900 text-stone-600 cursor-wait border-stone-800"
-                    : girosDisponiveis > 0 && isMondayMorning
+                    : girosDisponiveis > 0
                       ? "bg-red-800 text-white hover:bg-red-700 hover:shadow-[0_0_30px_rgba(220,38,38,0.4)] border-red-600"
                       : "bg-stone-900 text-stone-700 cursor-not-allowed border-stone-800"
                 )}
               >
-                {spinning ? 'SPINNING...' : !isMondayMorning ? 'ONLY MONDAY MORNING' : 'SPIN'}
+                {spinning ? 'SPINNING...' : 'SPIN'}
             </button>
 
              {/* Result Display */}

@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { get, ref, set, update } from 'firebase/database';
+import { auth, rtdb } from '../lib/firebase';
+import { toMillis } from '../lib/date';
 
 export interface UserProfile {
   userId: string;
@@ -9,14 +10,14 @@ export interface UserProfile {
   nick: string;
   nickJogo: string; // username nos dados coletados (scraper)
   discord: string;
-  dataEntrada: any;
+  dataEntrada: number;
   cargo: string;
   lootSemanal: number;
   lootTotal: number;
   roletaDisponivel: number;
   extraSpins?: number; // Saldo manual de giros da roleta
   powerSpins?: number; // Saldo manual de giros da slot machine
-  criadoEm: any;
+  criadoEm: number;
 }
 
 interface AuthContextType {
@@ -41,17 +42,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   async function fetchProfile(u: User) {
-    const snap = await getDoc(doc(db, 'usuarios', u.uid));
-    if (snap.exists()) {
-      const data = snap.data() as UserProfile;
-      if (u.email === 'lucasmartinsa3009@gmail.com' && data.cargo !== 'Leader') {
-        const { updateDoc } = await import('firebase/firestore');
-        await updateDoc(doc(db, 'usuarios', u.uid), { cargo: 'Leader' });
-        data.cargo = 'Leader';
+    const userRef = ref(rtdb, `usuarios/${u.uid}`);
+    const fallbackProfile: UserProfile = {
+      userId: u.uid,
+      email: u.email || '',
+      nick: u.email?.split('@')[0] || 'Operative',
+      nickJogo: '',
+      discord: '',
+      dataEntrada: Date.now(),
+      cargo: u.email === 'lucasmartinsa3009@gmail.com' ? 'Leader' : 'Street Cleaner',
+      lootSemanal: 0,
+      lootTotal: 0,
+      roletaDisponivel: 0,
+      extraSpins: 0,
+      powerSpins: 0,
+      criadoEm: Date.now(),
+    };
+
+    try {
+      const snap = await get(userRef);
+
+      if (snap.exists()) {
+        const raw = snap.val() as Partial<UserProfile>;
+        const normalized: UserProfile = {
+          userId: raw.userId || u.uid,
+          email: raw.email || u.email || '',
+          nick: raw.nick || (u.email?.split('@')[0] ?? 'Operative'),
+          nickJogo: raw.nickJogo || '',
+          discord: raw.discord || '',
+          dataEntrada: toMillis(raw.dataEntrada) || Date.now(),
+          cargo: raw.cargo || 'Street Cleaner',
+          lootSemanal: Number(raw.lootSemanal || 0),
+          lootTotal: Number(raw.lootTotal || 0),
+          roletaDisponivel: Number(raw.roletaDisponivel || 0),
+          extraSpins: Number(raw.extraSpins || 0),
+          powerSpins: Number(raw.powerSpins || 0),
+          criadoEm: toMillis(raw.criadoEm) || Date.now(),
+        };
+
+        if (u.email === 'lucasmartinsa3009@gmail.com' && normalized.cargo !== 'Leader') {
+          await update(userRef, { cargo: 'Leader' });
+          normalized.cargo = 'Leader';
+        }
+
+        setProfile(normalized);
+        return;
       }
-      setProfile(data);
-    } else {
-      setProfile(null);
+
+      await set(userRef, fallbackProfile);
+      setProfile(fallbackProfile);
+    } catch (error) {
+      console.error('Falha ao carregar perfil no RTDB:', error);
+      // Mantem login funcional mesmo se regras bloquearem leitura/escrita do perfil.
+      setProfile(fallbackProfile);
     }
   }
 

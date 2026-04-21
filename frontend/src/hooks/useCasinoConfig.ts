@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { onValue, ref, set } from 'firebase/database';
+import { rtdb } from '../lib/firebase';
 
 export interface CasinoPrize {
   id: number;
@@ -51,9 +51,10 @@ export function useCasinoConfig() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'config', 'casino'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data() as CasinoConfig;
+    const configRef = ref(rtdb, 'config/casino');
+    const unsub = onValue(configRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val() as CasinoConfig;
         
         
         let loadedPrizes = data.prizes || defaultCasinoConfig.prizes;
@@ -77,7 +78,7 @@ export function useCasinoConfig() {
 
         if (loadedPrizes.length > 0 && loadedPrizes[0].chance >= 49 && loadedPrizes[0].name.includes('100k')) {
             loadedPrizes = defaultCasinoConfig.prizes; // Auto-update to new 49% default
-            setDoc(doc(db, 'config', 'casino'), { ...data, prizes: loadedPrizes }, { merge: true });
+            void set(configRef, { ...data, prizes: loadedPrizes });
         }
 
         setConfig({
@@ -97,7 +98,7 @@ export function useCasinoConfig() {
 
   const updateConfig = async (newConfig: CasinoConfig) => {
     try {
-      await setDoc(doc(db, 'config', 'casino'), newConfig);
+      await set(ref(rtdb, 'config/casino'), newConfig);
     } catch (e) {
       console.error("Failed to save casino config", e);
       throw e;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-const FIREBASE_URL = "https://deadbb-2d5a8-default-rtdb.firebaseio.com";
+const FIREBASE_URL = "https://deadclanbb-1f05e-default-rtdb.firebaseio.com";
 const REFRESH_MS = 5 * 60 * 1000;
 
 export interface MemberData {
@@ -71,20 +71,10 @@ export function useClanData() {
       const yD = String(yesterday.getDate()).padStart(2, '0');
       const yesterdayStr = `${yY}-${yM}-${yD}`;
 
-      // Calcula inicio da semana (segunda-feira)
-      const dayOfWeek = adjustedDate.getDay();
-      const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // 0 is Sunday
-      const mondayDate = new Date(adjustedDate.getTime() - diffToMonday * 24 * 60 * 60 * 1000);
-      const mY = mondayDate.getFullYear();
-      const mM = String(mondayDate.getMonth() + 1).padStart(2, '0');
-      const mD = String(mondayDate.getDate()).padStart(2, '0');
-      const weekStr = `${mY}-${mM}-${mD}`;
-
       // Fetches paralelos
-      const [profRes, dailyRes, _weeklyRes] = await Promise.all([
+      const [profRes, dailyRes] = await Promise.all([
         fetch(`${FIREBASE_URL}/profiles.json`).catch(() => null),
-        fetch(`${FIREBASE_URL}/daily.json?orderBy="$key"&endAt="${encodeURIComponent('"' + yesterdayStr + '"')}"&limitToLast=7`).catch(() => null),
-        fetch(`${FIREBASE_URL}/weekly/${weekStr}.json`).catch(() => null)
+        fetch(`${FIREBASE_URL}/daily.json?orderBy=%22$key%22&endAt=${encodeURIComponent(`"${yesterdayStr}"`)}&limitToLast=7`).catch(() => null)
       ]);
       const profiles = profRes && profRes.ok ? await profRes.json() : {};
       const dailyData = dailyRes && dailyRes.ok ? await dailyRes.json() : {};
@@ -112,8 +102,7 @@ export function useClanData() {
 
         const currentAll = val.all_time_loots || 0;
         const clanAllTime = val.all_time_clan_loots || 0;
-        const currentTS = val.all_time_ts || 0;
-        const currentTotalExp = val.total_exp || 0;
+        const currentTS = Number(val.alltimets || val.all_time_ts || 0);
 
         const dbUserKey = encodeURIComponent(val.username || "").replace(/\./g, '%2E');
 
@@ -130,7 +119,7 @@ export function useClanData() {
                     baselineLoot = snap.alltimeloot !== undefined ? Number(snap.alltimeloot) : (snap.all_time_loots !== undefined ? Number(snap.all_time_loots) : null);
                 }
                 if (baselineExp === null) {
-                    const snapExp = snap.total_exp !== undefined ? Number(snap.total_exp) : (snap.alltimets !== undefined ? Number(snap.alltimets) : (snap.all_time_ts !== undefined ? Number(snap.all_time_ts) : null));
+                    const snapExp = snap.alltimets !== undefined ? Number(snap.alltimets) : (snap.all_time_ts !== undefined ? Number(snap.all_time_ts) : null);
                     if (snapExp !== null) {
                         baselineExp = snapExp;
                     }
@@ -155,7 +144,7 @@ export function useClanData() {
         // ----- CALCULO DO TS DIÁRIO -----
         let dailyTS = 0;
         if (baselineExp !== null) {
-            dailyTS = Math.max(0, currentTotalExp - baselineExp);
+            dailyTS = Math.max(0, currentTS - baselineExp);
         } else {
             dailyTS = 0;
         }

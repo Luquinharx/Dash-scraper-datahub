@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useClanMemberData } from '../../hooks/useClanMemberData';
 import { usePowerRouletteConfig, type PowerRoulettePrize } from '../../hooks/usePowerRouletteConfig';
-import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, addDoc, Timestamp, updateDoc, doc, increment } from 'firebase/firestore';
+import { get, push, ref, runTransaction } from 'firebase/database';
+import { rtdb } from '../../lib/firebase';
 import { Zap, Info } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { formatDateTimePtBR, toMillis } from '../../lib/date';
 
 export default function PowerRoleta() {
   const { profile, refreshProfile } = useAuth();
@@ -36,59 +37,40 @@ export default function PowerRoleta() {
     startOfPrizeWeek.setDate(now.getDate() - daysToSubtract);
     startOfPrizeWeek.setHours(7, 53, 0, 0);
 
-      const nextSpinDate = new Date(startOfPrizeWeek);
-      nextSpinDate.setDate(nextSpinDate.getDate() + 7);
-      const nextSpinStr = `${String(nextSpinDate.getDate()).padStart(2, '0')}/${String(nextSpinDate.getMonth() + 1).padStart(2, '0')} - 07:53`;
-
-      return { startOfPrizeWeek, nextSpinStr };
+      return { startOfPrizeWeek };
     }, []);
 
-    const { startOfPrizeWeek, nextSpinStr } = getPreviousWeekRange();
-
-  const rawWeeklyLoot = Number(stats?.weekly_loots || 0);
-  const rawClanWeeklyLoot = Number(stats?.clan_weekly_loots || 0);
-  const weeklyLoot = Math.max(rawWeeklyLoot, rawClanWeeklyLoot);
-
-  const rawWeeklyTs = Number(stats?.weekly_ts || 0);
-  const rawClanWeeklyTs = Number(stats?.clan_weekly_ts || 0);
-  const weeklyTs = Math.max(rawWeeklyTs, rawClanWeeklyTs);
-
-  const clanWeeklyLoot = Math.max(rawClanWeeklyLoot, rawWeeklyLoot);
-  const clanWeeklyTs = Math.max(rawClanWeeklyTs, rawWeeklyTs);
-  
-  const isClanEventHighlight = clanWeeklyLoot >= 5000 || clanWeeklyTs >= 3_000_000_000;
-  const isPowerRaw = weeklyLoot >= 800 || weeklyTs >= 350_000_000;
-  const isQualified = isPowerRaw && !isClanEventHighlight;
+    const { startOfPrizeWeek } = getPreviousWeekRange();
+  const weeklyLoot = Number(stats?.weekly_loots || 0);
+  const isQualified = weeklyLoot >= 800;
 
   const weeklyTotal = isQualified ? 1 : 0;
   const powerSpins = profile?.powerSpins || 0;
 
   useEffect(() => {
     if (!profile?.userId) return;
+    const userId = profile.userId;
     async function load() {
       try {
-        const q = query(
-            collection(db, 'power_roletas'), 
-            where('userId', '==', profile!.userId)
-        );
-        const snap = await getDocs(q);
-        
+        const snap = await get(ref(rtdb, 'power_roletas'));
+        const spinsData = (snap.val() || {}) as Record<string, { userId?: string; premio?: string; data?: unknown; entregue?: boolean }>;
+
         let count = 0;
         const list: { prize: string; date: string; claimed: boolean }[] = [];
         const startTs = startOfPrizeWeek.getTime();
 
-        snap.forEach(d => {
-          const data = d.data();
-          const dataDate = data.data?.toDate?.();
-          
-          if (dataDate && dataDate.getTime() >= startTs) {
-             count++;
+        Object.values(spinsData).forEach((entry) => {
+          if (entry.userId !== userId) return;
+          const dataMillis = toMillis(entry.data);
+
+          if (dataMillis >= startTs) {
+            count++;
           }
 
           list.push({
-            prize: data.premio,
-            date: dataDate ? dataDate.toLocaleString('en-US') : String(data.data),
-            claimed: !!data.entregue,
+            prize: entry.premio || '-',
+            date: formatDateTimePtBR(entry.data),
+            claimed: !!entry.entregue,
           });
         });
 
@@ -105,10 +87,8 @@ export default function PowerRoleta() {
   const remainingWeeklySpins = Math.max(0, weeklyTotal - usedSpins);
   const availableSpins = Math.min(3, remainingWeeklySpins + powerSpins);
 
-  const isMondayMorning = new Date().getDay() === 1 && new Date().getHours() < 12;
-
   const spinWheel = useCallback(async () => {
-    if (spinning || availableSpins <= 0 || !profile?.userId || config.prizes.length === 0 || !isMondayMorning) return;
+    if (spinning || availableSpins <= 0 || !profile?.userId || config.prizes.length === 0) return;
 
     setSpinning(true);
     setResult(null);
@@ -146,17 +126,18 @@ export default function PowerRoleta() {
     await new Promise(r => setTimeout(r, 6000));
     
     try {
-      await addDoc(collection(db, 'power_roletas'), {
+      await push(ref(rtdb, 'power_roletas'), {
         userId: profile.userId,
         premio: selected.name,
-        data: Timestamp.now(),
+        data: Date.now(),
         entregue: false,
       });
 
       const hasWeeklyAvailable = weeklyTotal > usedSpins;
       if (!hasWeeklyAvailable && powerSpins > 0) {
-        await updateDoc(doc(db, 'usuarios', profile.userId), {
-            powerSpins: increment(-1)
+        await runTransaction(ref(rtdb, `usuarios/${profile.userId}/powerSpins`), (current) => {
+          const nowValue = Number(current || 0);
+          return nowValue > 0 ? nowValue - 1 : 0;
         });
       }
     } catch (err) {
@@ -187,7 +168,7 @@ export default function PowerRoleta() {
                 <span className="text-red-600">Blood</span> Wheel
               </h1>
               <p className="text-stone-400 font-medium tracking-widest uppercase mt-2 text-sm flex items-center gap-2">
-                <Info className="w-4 h-4"/> ONE SPIN PER WEEK • QUALIFICATION: 800+ LOOTS OR 350M+ TS
+                <Info className="w-4 h-4"/> ONE SPIN PER WEEK • QUALIFICATION: 800+ WEEKLY LOOT
               </p>
             </div>
           </div>
@@ -197,7 +178,7 @@ export default function PowerRoleta() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-stone-950 border border-white/5 rounded-lg p-5 text-center shadow-2xl relative overflow-hidden group hover:border-purple-500/30 transition-colors">
             <div className="absolute top-0 left-0 w-1 h-full bg-purple-600/50"></div>
-            <p className="text-xs text-stone-500 uppercase tracking-widest font-black">Last Week Loot</p>
+            <p className="text-xs text-stone-500 uppercase tracking-widest font-black">Weekly Loot</p>
             <p className="text-2xl font-black text-white mt-2 drop-shadow-md">
                 {weeklyLoot.toLocaleString('en-US')}
             </p>
@@ -224,9 +205,9 @@ export default function PowerRoleta() {
 
           <div className="bg-stone-950 border border-purple-900/30 rounded-lg p-5 text-center shadow-[0_0_20px_rgba(168,85,247,0.1)] relative overflow-hidden">
              <div className="absolute top-0 left-0 w-1 h-full bg-fuchsia-500"></div>
-            <p className="text-xs text-purple-400 uppercase tracking-widest font-black">Next Spin</p>
+            <p className="text-xs text-purple-400 uppercase tracking-widest font-black">Goal</p>
             <p className="text-2xl font-black text-fuchsia-400 mt-2 drop-shadow-[0_0_10px_rgba(217,70,239,0.5)]">
-                {nextSpinStr}
+                800
             </p>
           </div>
         </div>
@@ -331,17 +312,17 @@ export default function PowerRoleta() {
             {/* Spin Control Button */}
              <button
                 onClick={spinWheel}
-                disabled={spinning || availableSpins <= 0 || !isMondayMorning}
+                disabled={spinning || availableSpins <= 0}
                 className={cn(
                   "relative z-10 px-12 sm:px-20 py-5 sm:py-6 rounded-full font-sans font-black text-xl sm:text-2xl uppercase tracking-[0.2em] shadow-[0_15px_40px_rgba(0,0,0,0.6)] transform transition-transform active:scale-[0.98] border-b-[6px] active:border-b-0 active:translate-y-1 mt-4",
                   spinning
                     ? "bg-stone-900 text-stone-600 cursor-wait border-stone-950"
-                    : availableSpins > 0 && isMondayMorning
+                    : availableSpins > 0
                       ? "bg-gradient-to-b from-purple-500 to-purple-700 text-white hover:from-purple-400 hover:to-purple-600 hover:shadow-[0_0_60px_rgba(168,85,247,0.7)] border-purple-900"
                       : "bg-stone-900 text-stone-700 cursor-not-allowed border-stone-950 shadow-none"
                 )}
               >
-                {spinning ? 'SPINNING...' : !isMondayMorning ? 'ONLY MONDAY MORNING' : 'SPIN THE WHEEL'}
+                {spinning ? 'SPINNING...' : 'SPIN THE WHEEL'}
             </button>
 
              {/* Result Modal / Display */}

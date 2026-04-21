@@ -1,32 +1,50 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, Timestamp, query, orderBy, limit } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
 import { initializeApp } from 'firebase/app';
-import { db } from '../../lib/firebase';
+import { get, ref, remove, update, set } from 'firebase/database';
+import { rtdb } from '../../lib/firebase';
 import { useAuth, type UserProfile } from '../../hooks/useAuth';
 import { useScrapedUsernames } from '../../hooks/useClanMemberData';
-import { useProfilesData } from '../../hooks/useProfilesData';
-import { RankBadge } from '../RankBadge';
-import { Edit3, Trash2, Save, X, Search, UserPlus, Gift, Check, ShieldAlert, Loader2, Settings } from 'lucide-react';
+import { Edit3, Trash2, Save, X, Search, UserPlus, Gift, Check, ShieldAlert, Loader2, Settings, Coins } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import CasinoSettings from './CasinoSettings';
 import PowerRouletteSettings from './PowerRouletteSettings';
+import { formatDateTimePtBR, toMillis } from '../../lib/date';
 
 const CARGOS = ['Leader', 'High Warden', 'Blade Master', 'Guardian', 'Gate Keeper', 'Street Cleaner'];
+
+type DonationAuditEntry = {
+  id: string;
+  runId: string;
+  entryId: string;
+  username: string;
+  action: string;
+  currency: string;
+  amount: number;
+  isCredit: boolean;
+  time: string;
+  ingestedAt: string;
+  ingestedTs: number;
+  excluded: boolean;
+};
 
 
 // Auth secundário para criar usuários sem deslogar o admin
 const secondaryApp = initializeApp({
-  apiKey: "AIzaSyA9E6Hrkbfnex1YvxJVplbf49RdEa8dcMc",
-  authDomain: "deadbb-2d5a8.firebaseapp.com",
-  projectId: "deadbb-2d5a8",
+  apiKey: "AIzaSyBsH0thsRXAti-gbnsJLpIAMroe7PTyL2I",
+  authDomain: "deadclanbb-1f05e.firebaseapp.com",
+  databaseURL: "https://deadclanbb-1f05e-default-rtdb.firebaseio.com",
+  projectId: "deadclanbb-1f05e",
+  storageBucket: "deadclanbb-1f05e.firebasestorage.app",
+  messagingSenderId: "208227509819",
+  appId: "1:208227509819:web:ca440d6a17cebd901a5e1e",
+  measurementId: "G-Z1DZW09YFS",
 }, 'secondary-admin');
 const secondaryAuth = getAuth(secondaryApp);
 
 export default function GerenciarUsuarios() {
   const { profile, refreshProfile } = useAuth();
   const { usernames: scrapedNames } = useScrapedUsernames();
-  const { profiles } = useProfilesData();
 
   const isSuperUser = profile?.email === 'bone.ak103@gmail.com';
   const isOfficerOnly = profile?.cargo === 'Officer';
@@ -35,7 +53,7 @@ export default function GerenciarUsuarios() {
     const isAdmin = isLeader || isHighLeader;
 
     // Tabs
-    const [activeTab, setActiveTab] = useState<'members' | 'spins' | 'powerspins' | 'casino'>(isHighLeader ? 'spins' : 'members');
+    const [activeTab, setActiveTab] = useState<'members' | 'spins' | 'powerspins' | 'donations' | 'casino'>(isHighLeader ? 'spins' : 'members');
   const [usuarios, setUsuarios] = useState<(UserProfile & { docId: string })[]>([]);
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -48,6 +66,10 @@ export default function GerenciarUsuarios() {
 
   const [powerSpinsActivity, setPowerSpinsActivity] = useState<any[]>([]);
   const [powerSpinsLoading, setPowerSpinsLoading] = useState(false);
+  const [donationEntries, setDonationEntries] = useState<DonationAuditEntry[]>([]);
+  const [donationsLoading, setDonationsLoading] = useState(false);
+  const [donationSearch, setDonationSearch] = useState('');
+  const [showExcludedOnly, setShowExcludedOnly] = useState(false);
 
   // --- Pagination & Sorting state ---
   const [currentPage, setCurrentPage] = useState(1);
@@ -61,7 +83,6 @@ export default function GerenciarUsuarios() {
   const [cadNick, setCadNick] = useState('');
   const [cadNickJogo, setCadNickJogo] = useState('');
   const [cadDiscord, setCadDiscord] = useState('');
-  const [cadDataEntrada, setCadDataEntrada] = useState('');
   const [cadCargo, setCadCargo] = useState('Street Cleaner');
   const [cadError, setCadError] = useState('');
   const [cadSuccess, setCadSuccess] = useState('');
@@ -69,10 +90,25 @@ export default function GerenciarUsuarios() {
 
   async function loadAll() {
     setLoading(true);
-    const snap = await getDocs(collection(db, 'usuarios'));
-    const list: (UserProfile & { docId: string })[] = [];
-    snap.forEach(d => list.push({ ...(d.data() as UserProfile), docId: d.id }));
-    list.sort((a, b) => a.nick.localeCompare(b.nick));
+    const snap = await get(ref(rtdb, 'usuarios'));
+    const rawUsers = (snap.val() || {}) as Record<string, Partial<UserProfile>>;
+    const list: (UserProfile & { docId: string })[] = Object.entries(rawUsers).map(([docId, value]) => ({
+      userId: value.userId || docId,
+      email: value.email || '',
+      nick: value.nick || '',
+      nickJogo: value.nickJogo || '',
+      discord: value.discord || '',
+      dataEntrada: toMillis(value.dataEntrada),
+      cargo: value.cargo || 'Street Cleaner',
+      lootSemanal: Number(value.lootSemanal || 0),
+      lootTotal: Number(value.lootTotal || 0),
+      roletaDisponivel: Number(value.roletaDisponivel || 0),
+      extraSpins: Number(value.extraSpins || 0),
+      powerSpins: Number(value.powerSpins || 0),
+      criadoEm: toMillis(value.criadoEm) || Date.now(),
+      docId,
+    }));
+    list.sort((a, b) => (a.nick || '').localeCompare(b.nick || ''));
     setUsuarios(list);
     setLoading(false);
   }
@@ -85,32 +121,44 @@ export default function GerenciarUsuarios() {
            await loadAll();
         }
 
-        const q = query(collection(db, 'roletas'), orderBy('data', 'desc'), limit(100)); // Limit to last 100 for performance
-        const snap = await getDocs(q);
+        const snap = await get(ref(rtdb, 'roletas'));
+        const roletasMap = (snap.val() || {}) as Record<string, any>;
         const list: any[] = [];
         
         let currentUsers = usuarios;
         if (currentUsers.length === 0) {
-            const uSnap = await getDocs(collection(db, 'usuarios'));
-            const uList: any[] = [];
-            uSnap.forEach(u => uList.push({ ...u.data(), docId: u.id }));
-            currentUsers = uList;
-            setUsuarios(uList);
+            const uSnap = await get(ref(rtdb, 'usuarios'));
+            const uMap = (uSnap.val() || {}) as Record<string, Partial<UserProfile>>;
+            const parsedUsers = Object.entries(uMap).map(([docId, value]) => ({
+              ...(value as UserProfile),
+              userId: value.userId || docId,
+              nick: value.nick || '',
+              nickJogo: value.nickJogo || '',
+              email: value.email || '',
+              discord: value.discord || '',
+              cargo: value.cargo || 'Street Cleaner',
+              extraSpins: Number(value.extraSpins || 0),
+              powerSpins: Number(value.powerSpins || 0),
+              docId,
+            }));
+            currentUsers = parsedUsers;
+            setUsuarios(parsedUsers as (UserProfile & { docId: string })[]);
         }
 
-        snap.forEach(d => {
-            const data = d.data();
+        Object.entries(roletasMap).forEach(([id, data]) => {
             const uDetails = currentUsers.find(u => u.docId === data.userId || u.userId === data.userId);
             const resolvedName = uDetails ? (uDetails.nickJogo || uDetails.nick || data.userId) : data.userId;
             
             list.push({
-                id: d.id,
+                id,
                 ...data,
                 resolvedName,
-                formattedDate: data.data?.toDate?.() ? data.data.toDate().toLocaleDateString('pt-BR') + ' ' + data.data.toDate().toLocaleTimeString('pt-BR') : 'Invalid Date'
+                formattedDate: formatDateTimePtBR(data.data),
+                sortDate: toMillis(data.data),
             });
         });
-        setSpins(list);
+        list.sort((a, b) => Number(b.sortDate || 0) - Number(a.sortDate || 0));
+        setSpins(list.slice(0, 100));
     } catch (error) {
         console.error("Error loading spins", error);
     } finally {
@@ -123,32 +171,44 @@ export default function GerenciarUsuarios() {
     try {
         if (usuarios.length === 0) await loadAll();
 
-        const q = query(collection(db, 'power_roletas'), orderBy('data', 'desc'), limit(100));
-        const snap = await getDocs(q);
+        const snap = await get(ref(rtdb, 'power_roletas'));
+        const powerMap = (snap.val() || {}) as Record<string, any>;
         const list: any[] = [];
         
         let currentUsers = usuarios;
         if (currentUsers.length === 0) {
-            const uSnap = await getDocs(collection(db, 'usuarios'));
-            const uList: any[] = [];
-            uSnap.forEach(u => uList.push({ ...u.data(), docId: u.id }));
-            currentUsers = uList;
-            setUsuarios(uList);
+            const uSnap = await get(ref(rtdb, 'usuarios'));
+            const uMap = (uSnap.val() || {}) as Record<string, Partial<UserProfile>>;
+            const parsedUsers = Object.entries(uMap).map(([docId, value]) => ({
+              ...(value as UserProfile),
+              userId: value.userId || docId,
+              nick: value.nick || '',
+              nickJogo: value.nickJogo || '',
+              email: value.email || '',
+              discord: value.discord || '',
+              cargo: value.cargo || 'Street Cleaner',
+              extraSpins: Number(value.extraSpins || 0),
+              powerSpins: Number(value.powerSpins || 0),
+              docId,
+            }));
+            currentUsers = parsedUsers;
+            setUsuarios(parsedUsers as (UserProfile & { docId: string })[]);
         }
 
-        snap.forEach(d => {
-            const data = d.data();
+        Object.entries(powerMap).forEach(([id, data]) => {
             const uDetails = currentUsers.find(u => u.docId === data.userId || u.userId === data.userId);
             const resolvedName = uDetails ? (uDetails.nickJogo || uDetails.nick || data.userId) : data.userId;
             
             list.push({
-                id: d.id,
+                id,
                 ...data,
                 resolvedName,
-                formattedDate: data.data?.toDate?.() ? data.data.toDate().toLocaleDateString('pt-BR') + ' ' + data.data.toDate().toLocaleTimeString('pt-BR') : 'Invalid Date'
+                formattedDate: formatDateTimePtBR(data.data),
+                sortDate: toMillis(data.data),
             });
         });
-        setPowerSpinsActivity(list);
+        list.sort((a, b) => Number(b.sortDate || 0) - Number(a.sortDate || 0));
+        setPowerSpinsActivity(list.slice(0, 100));
     } catch (error) {
         console.error("Error loading power spins", error);
     } finally {
@@ -156,10 +216,93 @@ export default function GerenciarUsuarios() {
     }
   }
 
+  function parseAmountFromCurrency(currency: string): number {
+    const digits = (currency || '').replace(/\D/g, '');
+    return Number(digits || 0);
+  }
+
+  async function loadDonations() {
+    setDonationsLoading(true);
+    try {
+      const [runsSnap, exclusionsSnap] = await Promise.all([
+        get(ref(rtdb, 'clan_logs/runs')),
+        get(ref(rtdb, 'config/donation_exclusions')),
+      ]);
+
+      const runsMap = (runsSnap.val() || {}) as Record<string, any>;
+      const exclusionMap = (exclusionsSnap.val() || {}) as Record<string, boolean>;
+
+      const entries: DonationAuditEntry[] = [];
+      Object.entries(runsMap).forEach(([runId, runValue]) => {
+        const run = runValue as { bank?: Record<string, any> | any[] };
+        const bank = run?.bank;
+        if (!bank) return;
+
+        const pairList: Array<[string, any]> = Array.isArray(bank)
+          ? bank.map((entry, index) => [String(index), entry])
+          : Object.entries(bank);
+
+        pairList.forEach(([entryId, rawEntry]) => {
+          const entry = rawEntry as { fields?: Record<string, unknown>; ingested_at?: string };
+          const fields = entry?.fields || {};
+          const action = String(fields.action || '').toLowerCase();
+          if (action !== 'give') return;
+
+          const username = String(fields.username || '').trim() || 'Unknown';
+          const currency = String(fields.currency || '');
+          const amount = parseAmountFromCurrency(currency);
+          const isCredit = currency.toLowerCase().includes('credit');
+          const ingestedAt = typeof entry?.ingested_at === 'string' ? entry.ingested_at : '';
+          const ingestedTs = ingestedAt ? Date.parse(ingestedAt) : 0;
+          const id = `${runId}_${entryId}`;
+
+          entries.push({
+            id,
+            runId,
+            entryId,
+            username,
+            action,
+            currency,
+            amount,
+            isCredit,
+            time: String(fields.time || ''),
+            ingestedAt,
+            ingestedTs,
+            excluded: Boolean(exclusionMap[id]),
+          });
+        });
+      });
+
+      entries.sort((a, b) => Number(b.ingestedTs || 0) - Number(a.ingestedTs || 0));
+      setDonationEntries(entries);
+    } catch (error) {
+      console.error('Error loading donations audit:', error);
+    } finally {
+      setDonationsLoading(false);
+    }
+  }
+
+  async function toggleDonationExclusion(entry: DonationAuditEntry) {
+    try {
+      const targetRef = ref(rtdb, `config/donation_exclusions/${entry.id}`);
+      if (entry.excluded) {
+        await remove(targetRef);
+      } else {
+        await set(targetRef, true);
+      }
+      setDonationEntries(prev => prev.map(item => (
+        item.id === entry.id ? { ...item, excluded: !item.excluded } : item
+      )));
+    } catch (error) {
+      console.error('Error toggling donation exclusion:', error);
+    }
+  }
+
   useEffect(() => { 
       if (activeTab === 'members') loadAll(); 
       if (activeTab === 'spins') { loadAll(); loadSpins(); }
       if (activeTab === 'powerspins') { loadAll(); loadPowerSpins(); }
+      if (activeTab === 'donations') { loadDonations(); }
   }, [activeTab]);
 
   function startEdit(u: UserProfile & { docId: string }) {
@@ -176,7 +319,7 @@ export default function GerenciarUsuarios() {
 
   async function saveEdit(docId: string) {
     try {
-      await updateDoc(doc(db, 'usuarios', docId), {
+      await update(ref(rtdb, `usuarios/${docId}`), {
         nick: editForm.nick,
         discord: editForm.discord,
         cargo: editForm.cargo,
@@ -194,7 +337,7 @@ export default function GerenciarUsuarios() {
   async function handleDelete(docId: string, nickName: string) {
     if (!confirm(`Are you sure you want to remove "${nickName}"?`)) return;
     try {
-      await deleteDoc(doc(db, 'usuarios', docId));
+      await remove(ref(rtdb, `usuarios/${docId}`));
       await loadAll();
     } catch (err) {
       console.error('Erro ao deletar:', err);
@@ -204,7 +347,7 @@ export default function GerenciarUsuarios() {
   // Spin Actions
   async function markSpinDelivered(spinId: string) {
       try {
-          await updateDoc(doc(db, 'roletas', spinId), { entregue: true });
+          await update(ref(rtdb, `roletas/${spinId}`), { entregue: true });
           setSpins(prev => prev.map(s => s.id === spinId ? { ...s, entregue: true } : s));
       } catch (e) {
           console.error("Error marking delivered", e);
@@ -214,7 +357,7 @@ export default function GerenciarUsuarios() {
   async function deleteSpin(spinId: string) {
       if(!confirm("Are you sure you want to delete this spin record?")) return;
       try {
-          await deleteDoc(doc(db, 'roletas', spinId));
+          await remove(ref(rtdb, `roletas/${spinId}`));
           setSpins(prev => prev.filter(s => s.id !== spinId));
       } catch (e) {
           console.error("Error deleting spin", e);
@@ -224,7 +367,7 @@ export default function GerenciarUsuarios() {
 
   async function markPowerSpinDelivered(spinId: string) {
       try {
-          await updateDoc(doc(db, 'power_roletas', spinId), { entregue: true });
+          await update(ref(rtdb, `power_roletas/${spinId}`), { entregue: true });
           setPowerSpinsActivity(prev => prev.map(s => s.id === spinId ? { ...s, entregue: true } : s));
       } catch (e) {
           console.error("Error marking delivered", e);
@@ -234,7 +377,7 @@ export default function GerenciarUsuarios() {
   async function deletePowerSpin(spinId: string) {
       if(!confirm("Are you sure you want to delete this power spin record?")) return;
       try {
-          await deleteDoc(doc(db, 'power_roletas', spinId));
+          await remove(ref(rtdb, `power_roletas/${spinId}`));
           setPowerSpinsActivity(prev => prev.filter(s => s.id !== spinId));
       } catch (e) {
           console.error("Error deleting power spin", e);
@@ -251,24 +394,24 @@ export default function GerenciarUsuarios() {
       const uid = cred.user.uid;
       await secondaryAuth.signOut();
 
-      await setDoc(doc(db, 'usuarios', uid), {
+      await set(ref(rtdb, `usuarios/${uid}`), {
         userId: uid,
         email: cadEmail,
         nick: cadNick,
         nickJogo: cadNickJogo,
         discord: cadDiscord,
-        dataEntrada: cadDataEntrada ? Timestamp.fromDate(new Date(cadDataEntrada + 'T00:00:00')) : Timestamp.now(),
+        dataEntrada: Date.now(),
         cargo: cadCargo,
         extraSpins: 0,
         powerSpins: 0,
         lootSemanal: 0,
         lootTotal: 0,
         roletaDisponivel: 0,
-        criadoEm: Timestamp.now(),
+        criadoEm: Date.now(),
       });
 
       setCadSuccess(`User "${cadNick}" successfully registered!`);
-      setCadEmail(''); setCadSenha(''); setCadNick(''); setCadNickJogo(''); setCadDiscord(''); setCadDataEntrada(''); setCadCargo('Member');
+      setCadEmail(''); setCadSenha(''); setCadNick(''); setCadNickJogo(''); setCadDiscord(''); setCadCargo('Street Cleaner');
       await loadAll();
     } catch (err: any) {
       const code = err?.code || '';
@@ -310,15 +453,8 @@ export default function GerenciarUsuarios() {
 
     // Handle Timestamps
     if (sortConfig.key === 'dataEntrada') {
-      valA = a.dataEntrada?.toMillis?.() || 0;
-      valB = b.dataEntrada?.toMillis?.() || 0;
-    }
-
-    if (sortConfig.key === 'rank') {
-      valA = profiles.find(p => p.username === a.nickJogo)?.rank || '';
-      valB = profiles.find(p => p.username === b.nickJogo)?.rank || '';
-      if (valA === 'Street Cleaner') valA = 'Z'; // Push missing ranks to bottom when sorting ASC
-      if (valB === 'Street Cleaner') valB = 'Z';
+      valA = toMillis(a.dataEntrada);
+      valB = toMillis(b.dataEntrada);
     }
 
     if (typeof valA === 'string' && typeof valB === 'string') {
@@ -337,6 +473,17 @@ export default function GerenciarUsuarios() {
     currentPage * itemsPerPage
   );
 
+  const visibleDonations = donationEntries.filter((entry) => {
+    const q = donationSearch.trim().toLowerCase();
+    const matchesSearch = !q
+      || entry.username.toLowerCase().includes(q)
+      || entry.currency.toLowerCase().includes(q)
+      || entry.runId.toLowerCase().includes(q);
+
+    const matchesExcluded = showExcludedOnly ? entry.excluded : true;
+    return matchesSearch && matchesExcluded;
+  });
+
 
   // Auto-promote superuser if needed
   useEffect(() => {
@@ -345,7 +492,7 @@ export default function GerenciarUsuarios() {
           const promoteUser = async () => {
               try {
                   // Force database update
-                  await updateDoc(doc(db, 'usuarios', profile.userId), { cargo: 'Leader' });
+                  await update(ref(rtdb, `usuarios/${profile.userId}`), { cargo: 'Leader' });
                   // Refresh context to update UI immediately
                   await refreshProfile();
               } catch (err) {
@@ -411,6 +558,17 @@ export default function GerenciarUsuarios() {
                 )}
               >
                   Power Wheel Spins
+              </button>
+              <button
+                onClick={() => setActiveTab('donations')}
+                className={cn(
+                    "px-6 py-2 rounded-sm text-sm uppercase tracking-widest font-bold transition-all whitespace-nowrap",
+                    activeTab === 'donations' ? "bg-blue-900/30 text-blue-400 border border-blue-900/50 shadow-[0_0_10px_rgba(59,130,246,0.2)]" : "text-stone-500 hover:text-stone-300 hover:bg-white/5"
+                )}
+              >
+                  <span className="flex items-center gap-2">
+                    <Coins className="w-4 h-4" /> DONATIONS AUDIT
+                  </span>
               </button>
               <button
                 onClick={() => setActiveTab('casino')}
@@ -514,11 +672,6 @@ export default function GerenciarUsuarios() {
                     placeholder="user#0000" />
                 </div>
                 <div className="space-y-2">
-                    <label className="text-[10px] uppercase tracking-widest text-stone-500 font-bold">Enlistment Date</label>
-                    <input type="date" value={cadDataEntrada} onChange={e => setCadDataEntrada(e.target.value)} required
-                    className="w-full px-4 py-2 bg-stone-950 border border-white/10 rounded-sm text-white focus:outline-none focus:border-red-500 transition-colors text-sm font-mono" />
-                </div>
-                <div className="space-y-2">
                     <label className="text-[10px] uppercase tracking-widest text-stone-500 font-bold">Clearance Level (Rank)</label>
                     <select value={cadCargo} onChange={e => setCadCargo(e.target.value)}
                     className="w-full px-4 py-2 bg-stone-950 border border-white/10 rounded-sm text-white focus:outline-none focus:border-red-500 transition-colors text-sm font-mono">
@@ -553,7 +706,6 @@ export default function GerenciarUsuarios() {
                         <th className="px-6 py-4 font-normal cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('email')}><div className="flex items-center">Email {renderSortIcon('email')}</div></th>
                         <th className="px-6 py-4 font-normal cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('discord')}><div className="flex items-center">Cargos Discord {renderSortIcon('discord')}</div></th>
                         <th className="px-6 py-4 font-normal cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('cargo')}><div className="flex items-center">Access {renderSortIcon('cargo')}</div></th>
-                        <th className="px-6 py-4 font-normal cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('rank')}><div className="flex items-center">Scrap Rank {renderSortIcon('rank')}</div></th>
                           <th className="px-6 py-4 font-normal cursor-pointer hover:text-white transition-colors whitespace-nowrap" onClick={() => handleSort('extraSpins')}><div className="flex items-center">Slot Spins {renderSortIcon('extraSpins')}</div></th>
                           <th className="px-6 py-4 font-normal cursor-pointer hover:text-white transition-colors whitespace-nowrap" onClick={() => handleSort('powerSpins')}><div className="flex items-center">Power Wheel Spins {renderSortIcon('powerSpins')}</div></th>
                         <th className="px-6 py-4 text-center font-normal">Actions</th>
@@ -585,9 +737,6 @@ export default function GerenciarUsuarios() {
                                 className="px-2 py-1 bg-black border border-white/20 rounded-sm text-white text-xs">
                                 {CARGOS.map(c => <option key={c} value={c}>{c}</option>)}
                                 </select>
-                            </td>
-                            <td className="px-6 py-3 text-center">
-                                <span className="text-xs text-stone-500">-</span>
                             </td>
                             <td className="px-6 py-3">
                                 <input 
@@ -627,9 +776,6 @@ export default function GerenciarUsuarios() {
                                 )}>
                                 {u.cargo}
                                 </span>
-                            </td>
-                            <td className="px-6 py-3">
-                                <RankBadge rank={profiles.find(p => p.username === u.nickJogo)?.rank || 'Street Cleaner'} />
                             </td>
                             <td className="px-6 py-3 text-center text-xs font-bold text-emerald-500">
                                 {u.extraSpins && u.extraSpins > 0 ? `+${u.extraSpins}` : <span className="text-stone-700">0</span>}
@@ -886,6 +1032,116 @@ export default function GerenciarUsuarios() {
                     )}
                 </div>
              </div>
+        )}
+
+        {/* DONATIONS AUDIT VIEW */}
+        {activeTab === 'donations' && (
+          <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
+            <div className="bg-stone-950/50 border border-white/10 rounded-sm overflow-hidden backdrop-blur-sm">
+              <div className="px-6 py-5 border-b border-white/10 bg-black flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <Coins className="w-5 h-5 text-blue-400" />
+                  <h2 className="text-sm font-bold text-white uppercase tracking-widest">Donations Audit (Give Logs)</h2>
+                </div>
+
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                  <div className="relative flex-1 md:flex-none">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-stone-500" />
+                    <input
+                      type="text"
+                      placeholder="FILTER USER/RUN/CURRENCY..."
+                      value={donationSearch}
+                      onChange={e => setDonationSearch(e.target.value)}
+                      className="w-full md:w-80 pl-8 pr-4 py-1.5 bg-black border border-white/10 rounded-sm text-white text-xs uppercase tracking-wider focus:outline-none focus:border-blue-500 transition-colors"
+                    />
+                  </div>
+                  <button
+                    onClick={() => setShowExcludedOnly(prev => !prev)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-sm text-[10px] uppercase tracking-wider border transition-colors",
+                      showExcludedOnly
+                        ? "bg-blue-900/30 text-blue-300 border-blue-900/50"
+                        : "bg-black text-stone-400 border-white/10 hover:text-white"
+                    )}
+                  >
+                    {showExcludedOnly ? 'Showing Excluded' : 'Show Excluded Only'}
+                  </button>
+                  <button
+                    onClick={loadDonations}
+                    className="text-xs text-stone-500 uppercase tracking-wider hover:text-white transition-colors whitespace-nowrap"
+                  >
+                    Refresh Data
+                  </button>
+                </div>
+              </div>
+
+              {donationsLoading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4 text-blue-400">
+                  <Loader2 className="w-8 h-8 animate-spin" />
+                  <span className="text-xs uppercase tracking-widest font-bold">Loading Donation Logs...</span>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm font-mono">
+                    <thead className="text-[10px] text-stone-500 uppercase bg-black border-b border-white/10 tracking-wider">
+                      <tr>
+                        <th className="px-6 py-4 font-normal text-left">Date</th>
+                        <th className="px-6 py-4 font-normal text-left">Username</th>
+                        <th className="px-6 py-4 font-normal text-left">Currency</th>
+                        <th className="px-6 py-4 font-normal text-right">Amount</th>
+                        <th className="px-6 py-4 font-normal text-center">Status</th>
+                        <th className="px-6 py-4 font-normal text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {visibleDonations.map(entry => (
+                        <tr key={entry.id} className="hover:bg-white/5 transition-colors">
+                          <td className="px-6 py-3 text-stone-500 text-xs">
+                            {entry.time || formatDateTimePtBR(entry.ingestedAt)}
+                          </td>
+                          <td className="px-6 py-3 text-white font-serif tracking-wide">{entry.username}</td>
+                          <td className="px-6 py-3 text-stone-400 text-xs">{entry.currency || '-'}</td>
+                          <td className="px-6 py-3 text-right font-bold text-emerald-400">
+                            {entry.isCredit ? `${entry.amount.toLocaleString('pt-BR')} CR` : `$${entry.amount.toLocaleString('pt-BR')}`}
+                          </td>
+                          <td className="px-6 py-3 text-center">
+                            <span className={cn(
+                              "inline-flex px-2 py-0.5 rounded-sm text-[10px] uppercase font-bold tracking-widest border",
+                              entry.excluded
+                                ? "bg-amber-950/30 text-amber-400 border-amber-900/50"
+                                : "bg-emerald-950/30 text-emerald-500 border-emerald-900/50"
+                            )}>
+                              {entry.excluded ? 'Excluded' : 'Counting'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 text-center">
+                            <button
+                              onClick={() => toggleDonationExclusion(entry)}
+                              className={cn(
+                                "px-3 py-1.5 rounded-sm text-[10px] uppercase tracking-wider border transition-colors",
+                                entry.excluded
+                                  ? "text-emerald-400 border-emerald-900/40 bg-emerald-900/10 hover:bg-emerald-900/20"
+                                  : "text-amber-400 border-amber-900/40 bg-amber-900/10 hover:bg-amber-900/20"
+                              )}
+                            >
+                              {entry.excluded ? 'Include in Stats' : 'Exclude from Stats'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {visibleDonations.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="text-center py-12 text-stone-600 font-serif uppercase tracking-widest">
+                            No donation records found.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {/* CASINO CONFIG VIEW */}

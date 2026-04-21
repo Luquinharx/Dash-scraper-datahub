@@ -11,7 +11,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 # Config
 CLAN_URL = "https://www.dfprofiler.com/clan/view/2166"
 BASE_URL = "https://www.dfprofiler.com"
-FIREBASE_DB_URL = "https://deadbb-2d5a8-default-rtdb.firebaseio.com/"
+FIREBASE_DB_URL = "https://deadclanbb-1f05e-default-rtdb.firebaseio.com/"
 USER_AGENT = "Mozilla/5.0 (compatible; scraper/3.0)"
 BRAZIL_TZ = pytz.timezone("America/Sao_Paulo")
 
