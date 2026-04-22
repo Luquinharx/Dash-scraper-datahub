@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { onValue, ref } from 'firebase/database';
+import { rtdb } from '../lib/firebase';
 import { useClanData } from './useClanData';
 
 export interface EventMemberStat {
@@ -8,97 +10,112 @@ export interface EventMemberStat {
   donatedCredits: number;
 }
 
+function normalizeUsername(value: string): string {
+  return (value || '').trim().toLowerCase();
+}
+
+function formatTimestampPtBr(timestampMs: number): string {
+  if (!Number.isFinite(timestampMs) || timestampMs <= 0) return '';
+  return new Date(timestampMs).toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function useEventStats() {
   const [stats, setStats] = useState<EventMemberStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdatedUrl, setLastUpdatedUrl] = useState<string>('');
   const { data: scraperData, loading: scraperLoading } = useClanData();
-  const [bankData, setBankData] = useState<any>(null);
+  const [bankData, setBankData] = useState<Record<string, any> | null>(null);
 
   useEffect(() => {
-    fetch("https://deadclanbb-1f05e-default-rtdb.firebaseio.com/clan_logs/runs.json")
-      .then(res => res.json())
-      .then(setBankData)
-      .catch(console.error);
+    const runsRef = ref(rtdb, 'clan_logs/runs');
+    const unsubscribe = onValue(
+      runsRef,
+      (snapshot) => {
+        setBankData((snapshot.val() || {}) as Record<string, any>);
+      },
+      (error) => {
+        console.error('Error listening clan_logs/runs:', error);
+        setBankData({});
+      }
+    );
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
-    async function fetchStats() {
-      if (scraperLoading || !bankData) return;
+    function fetchStats() {
+      if (scraperLoading || bankData === null) return;
       setLoading(true);
       try {
         const donatedCashMap: Record<string, number> = {};
         const donatedCreditsMap: Record<string, number> = {};
         const allLogs: any[] = [];
-        let maxTimestamp = 0;
-        let latestDate = "Indisponível";
+        let maxIngestedTimestamp = 0;
 
-        if (bankData) {
+        if (bankData && typeof bankData === 'object') {
           Object.values(bankData).forEach((run: any) => {
-            if (run && run.bank) {
-              const entries = Array.isArray(run.bank) ? run.bank : Object.values(run.bank);
-              entries.forEach((v: any) => {
-                if (v && v.fields) {
-                  allLogs.push(v.fields);
-                  if (v.ingested_at) {
-                    const dt = new Date(v.ingested_at).getTime();
-                    if (dt > maxTimestamp) {
-                      maxTimestamp = dt;
-                      latestDate = v.fields.time || new Date(v.ingested_at).toLocaleString('pt-BR');
-                    }
-                  }
-                }
-              });
-            }
+            if (!run?.bank) return;
+            const entries = Array.isArray(run.bank) ? run.bank : Object.values(run.bank);
+            entries.forEach((v: any) => {
+              if (v?.fields) {
+                allLogs.push(v.fields);
+              }
+
+              const parsed = v?.ingested_at ? Date.parse(v.ingested_at) : NaN;
+              if (Number.isFinite(parsed) && parsed > maxIngestedTimestamp) {
+                maxIngestedTimestamp = parsed;
+              }
+            });
           });
         }
-        setLastUpdatedUrl(latestDate);
+
+        setLastUpdatedUrl(formatTimestampPtBr(maxIngestedTimestamp));
 
         const isDateInEventRange = (timeStr: string) => {
           if (!timeStr) return false;
-          // timeStr is usually like "4/12/2026 01:55 AM" -> M/D/YYYY
           const parts = timeStr.split(' ');
           if (parts.length === 0) return false;
           const dateParts = parts[0].split('/');
           if (dateParts.length < 3) return false;
-          
-          let mStr = dateParts[0];
-          let dStr = dateParts[1];
-          let yStr = dateParts[2];
-          
-          // O formato que vem no scraper do dfprofiler: Mes/Dia/Ano
-          let m = parseInt(mStr, 10);
-          let d = parseInt(dStr, 10);
-          let y = parseInt(yStr, 10);
-          
-          // Para o evento de abril: de 9 a 12 de abril de 2026
-          if (y === 2026 && m === 4 && d >= 9 && d <= 12) {
-            return true;
-          }
-          return false;
+
+          const month = parseInt(dateParts[0], 10);
+          const day = parseInt(dateParts[1], 10);
+          const year = parseInt(dateParts[2], 10);
+          if (!Number.isFinite(month) || !Number.isFinite(day) || !Number.isFinite(year)) return false;
+
+          return year === 2026 && month === 4 && day >= 9 && day <= 12;
         };
 
-        allLogs.forEach(fields => {
-          if (fields.action === 'give' && fields.username && isDateInEventRange(fields.time)) {
-            const curr = (fields.currency || '').toLowerCase();
-            let amountStr = curr.replace(/[^0-9]/g, '');
-            const amount = Number(amountStr) || 0;
-            if (curr.includes('credit')) {
-              donatedCreditsMap[fields.username] = (donatedCreditsMap[fields.username] || 0) + amount;
-            } else {
-              donatedCashMap[fields.username] = (donatedCashMap[fields.username] || 0) + amount;
-            }
+        allLogs.forEach((fields) => {
+          if (fields.action !== 'give' || !fields.username || !isDateInEventRange(fields.time)) return;
+          const curr = String(fields.currency || '').toLowerCase();
+          const amount = Number(curr.replace(/[^0-9]/g, '')) || 0;
+          const usernameKey = normalizeUsername(String(fields.username));
+          if (!usernameKey) return;
+
+          if (curr.includes('credit')) {
+            donatedCreditsMap[usernameKey] = (donatedCreditsMap[usernameKey] || 0) + amount;
+          } else {
+            donatedCashMap[usernameKey] = (donatedCashMap[usernameKey] || 0) + amount;
           }
         });
 
-        // Map and include only those who donated something OR members just to show who didn't
-        // But since it's an event ladder, let's keep all members but only showing non-zero totals
-        const mergedStats: EventMemberStat[] = scraperData.map(scUser => ({
-          username: scUser.username,
-          rank: scUser.rank || 'Street Cleaner',
-          donatedCash: donatedCashMap[scUser.username] || 0,
-          donatedCredits: donatedCreditsMap[scUser.username] || 0,
-        }));
+        const mergedStats: EventMemberStat[] = scraperData.map((scUser) => {
+          const usernameKey = normalizeUsername(scUser.username);
+          return {
+            username: scUser.username,
+            rank: scUser.rank || 'Street Cleaner',
+            donatedCash: donatedCashMap[usernameKey] || 0,
+            donatedCredits: donatedCreditsMap[usernameKey] || 0,
+          };
+        });
 
         setStats(mergedStats);
       } catch (error) {

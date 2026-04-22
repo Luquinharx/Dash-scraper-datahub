@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { onValue, ref } from 'firebase/database';
+import { rtdb } from '../lib/firebase';
 
 const FIREBASE_URL = "https://deadclanbb-1f05e-default-rtdb.firebaseio.com";
 const REFRESH_MS = 60 * 1000;
@@ -303,6 +305,31 @@ export function useClanData() {
     fetchData();
     const id = setInterval(fetchData, REFRESH_MS);
     return () => clearInterval(id);
+  }, [fetchData]);
+
+  useEffect(() => {
+    let debounceId: number | undefined;
+    const unsubscribe = onValue(
+      ref(rtdb, 'profiles'),
+      () => {
+        if (debounceId) {
+          window.clearTimeout(debounceId);
+        }
+        debounceId = window.setTimeout(() => {
+          fetchData();
+        }, 200);
+      },
+      (listenerError) => {
+        console.error('Profiles listener error:', listenerError);
+      }
+    );
+
+    return () => {
+      if (debounceId) {
+        window.clearTimeout(debounceId);
+      }
+      unsubscribe();
+    };
   }, [fetchData]);
 
   useEffect(() => {

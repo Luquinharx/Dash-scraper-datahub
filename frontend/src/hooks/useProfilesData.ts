@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-
-const FIREBASE_PROFILES_URL = "https://deadclanbb-1f05e-default-rtdb.firebaseio.com/profiles.json";
-const REFRESH_MS = 60 * 1000;
+import { onValue, ref } from 'firebase/database';
+import { rtdb } from '../lib/firebase';
 
 export interface MemberProfile {
   username: string;
@@ -45,29 +44,12 @@ export function useProfilesData() {
   useEffect(() => {
     let cancelled = false;
 
-    const fetchProfiles = async () => {
-      const cacheBust = Date.now();
-      const response = await fetch(`${FIREBASE_PROFILES_URL}?_cb=${cacheBust}`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, max-age=0',
-          Pragma: 'no-cache',
-        },
-      }).catch(() => null);
-      if (!response || !response.ok) return null;
-      return response.json();
-    };
+    const unsubscribe = onValue(
+      ref(rtdb, 'profiles'),
+      (snapshot) => {
+        if (cancelled) return;
 
-    async function load() {
-      try {
-        const data = await fetchProfiles();
-        
-        if (!data) {
-          if (cancelled) return;
-          setProfiles([]);
-          return;
-        }
-
+        const data = (snapshot.val() || {}) as Record<string, Record<string, unknown>>;
         const toNumber = (value: unknown) => Number(value || 0);
         const toStringValue = (value: unknown) => (typeof value === 'string' ? value : '');
 
@@ -77,8 +59,6 @@ export function useProfilesData() {
 
             const item = rawValue as Record<string, unknown>;
             let username = toStringValue(item.username).trim();
-
-            // Some snapshots may miss username in value; use RTDB key as fallback.
             if (!username) {
               try {
                 username = decodeURIComponent(rawKey);
@@ -116,25 +96,20 @@ export function useProfilesData() {
           })
           .filter((item): item is MemberProfile => item !== null);
 
-        if (cancelled) return;
         setProfiles(parsedProfiles);
-      } catch (error) {
-        console.error('Failed to fetch profiles:', error);
-      } finally {
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Failed to listen profiles:', error);
         if (cancelled) return;
+        setProfiles([]);
         setLoading(false);
       }
-    }
+    );
 
-    load();
-    
-    const interval = setInterval(load, REFRESH_MS);
-    const onFocus = () => { load(); };
-    window.addEventListener('focus', onFocus);
     return () => {
       cancelled = true;
-      clearInterval(interval);
-      window.removeEventListener('focus', onFocus);
+      unsubscribe();
     };
   }, []);
 

@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { onValue, ref } from 'firebase/database';
+import { rtdb } from '../lib/firebase';
 import { useClanData } from './useClanData';
 
 export interface ClanMemberStat {
@@ -75,20 +77,39 @@ export function useAllClanStats() {
   useEffect(() => {
     let mounted = true;
 
-    async function loadBankAndExclusions() {
-      try {
-        const [runsRes, exclusionsRes, hiddenUsersRes] = await Promise.all([
-          fetch('https://deadclanbb-1f05e-default-rtdb.firebaseio.com/clan_logs/runs.json'),
-          fetch('https://deadclanbb-1f05e-default-rtdb.firebaseio.com/config/donation_exclusions.json'),
-          fetch('https://deadclanbb-1f05e-default-rtdb.firebaseio.com/config/donation_hidden_users.json'),
-        ]);
+    const unsubscribeRuns = onValue(
+      ref(rtdb, 'clan_logs/runs'),
+      (snapshot) => {
+        if (!mounted) return;
+        setBankData((snapshot.val() || {}) as Record<string, BankRun>);
+      },
+      (error) => {
+        console.error('Failed to listen clan_logs/runs:', error);
+        if (!mounted) return;
+        setBankData({});
+      }
+    );
 
-        const runsJson = runsRes.ok ? await runsRes.json() : {};
-        const exclusionsJson = exclusionsRes.ok ? await exclusionsRes.json() : {};
-        const hiddenUsersJson = hiddenUsersRes.ok ? await hiddenUsersRes.json() : {};
+    const unsubscribeExclusions = onValue(
+      ref(rtdb, 'config/donation_exclusions'),
+      (snapshot) => {
+        if (!mounted) return;
+        setExclusionMap((snapshot.val() || {}) as ExclusionMap);
+      },
+      (error) => {
+        console.error('Failed to listen donation exclusions:', error);
+        if (!mounted) return;
+        setExclusionMap({});
+      }
+    );
 
+    const unsubscribeHiddenUsers = onValue(
+      ref(rtdb, 'config/donation_hidden_users'),
+      (snapshot) => {
+        if (!mounted) return;
+        const hiddenUsersJson = (snapshot.val() || {}) as Record<string, boolean>;
         const normalizedHiddenUsers: HiddenUsersMap = {};
-        Object.entries((hiddenUsersJson || {}) as Record<string, boolean>).forEach(([rawKey, enabled]) => {
+        Object.entries(hiddenUsersJson).forEach(([rawKey, enabled]) => {
           if (!enabled) return;
           let decodedKey = rawKey;
           try {
@@ -98,26 +119,20 @@ export function useAllClanStats() {
           }
           normalizedHiddenUsers[normalizeUsername(decodedKey)] = true;
         });
-
-        if (!mounted) return;
-        setBankData((runsJson || {}) as Record<string, BankRun>);
-        setExclusionMap((exclusionsJson || {}) as ExclusionMap);
         setHiddenUsersMap(normalizedHiddenUsers);
-      } catch (error) {
-        console.error('Failed to load bank logs:', error);
+      },
+      (error) => {
+        console.error('Failed to listen hidden users map:', error);
         if (!mounted) return;
-        setBankData({});
-        setExclusionMap({});
         setHiddenUsersMap({});
       }
-    }
-
-    loadBankAndExclusions();
-    const interval = setInterval(loadBankAndExclusions, 60 * 1000);
+    );
 
     return () => {
       mounted = false;
-      clearInterval(interval);
+      unsubscribeRuns();
+      unsubscribeExclusions();
+      unsubscribeHiddenUsers();
     };
   }, []);
 
