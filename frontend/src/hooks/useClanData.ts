@@ -4,6 +4,7 @@ import { rtdb } from '../lib/firebase';
 
 const FIREBASE_URL = "https://deadclanbb-1f05e-default-rtdb.firebaseio.com";
 const REFRESH_MS = 60 * 1000;
+const DAILY_TS_BASELINE_WINDOW_MINUTES = 120;
 
 export interface MemberData {
   username: string;
@@ -235,7 +236,11 @@ export function useClanData() {
           }
         });
 
-        baselineExp = bestExp;
+        // Only use today's baseline when it is reasonably close to 08:00.
+        // Otherwise, fallback to the latest completed day to avoid zeroing Daily TS.
+        if (bestExp !== null && bestDistance <= DAILY_TS_BASELINE_WINDOW_MINUTES) {
+          baselineExp = bestExp;
+        }
 
         if (baselineExp === null) {
           for (let i = dailyDates.length - 1; i >= 0; i--) {
