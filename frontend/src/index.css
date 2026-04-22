@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.2; }
+}
+
+@keyframes subtle-drift {
+    0% { transform: scale(1.05); }
+    100% { transform: scale(1.15); }
+}
+
+@layer base {
+  body {
+    @apply bg-black text-slate-200 font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif text-white tracking-wider;
+  }
+}
+
+  .font-serif {
+    font-family: 'Cinzel', serif;
+  }
+  
+  .font-sans {
+    font-family: 'Inter', sans-serif;
+  }
+
+.animate-pulse-slow {
+  animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-subtle-drift {
+    animation: subtle-drift 10s ease-in-out infinite alternate;
+}
+
