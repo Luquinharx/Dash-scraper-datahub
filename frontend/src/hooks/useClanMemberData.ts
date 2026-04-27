@@ -121,6 +121,43 @@ export function useClanMemberData(username: string | undefined) {
       // O dropdown agora passa a chave real do Firebase (ex: "SAO%20Asuna", "killer%20instint%2023").
       // Repassamos direto pra URL sÃ³ fazendo encodeURIComponent nela pra lidar com barras e etc (e transformando em %2520, que o Firebase decoda pra %20 ao buscar no json)
       const dbUser = encodeURIComponent(username).replace(/\./g, '%2E');
+      const toNumber = (value: unknown): number => {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : 0;
+      };
+      const parseLoot = (snap: any): number | null => {
+        if (!snap || typeof snap !== "object") return null;
+        if (snap.all_time_loots !== undefined) return toNumber(snap.all_time_loots);
+        if (snap.alltimeloot !== undefined) return toNumber(snap.alltimeloot);
+        return null;
+      };
+      const parseTotalExp = (snap: any): number | null => {
+        if (!snap || typeof snap !== "object") return null;
+        if (snap.total_exp !== undefined) return toNumber(snap.total_exp);
+        if (snap.totalexp !== undefined) return toNumber(snap.totalexp);
+        if (snap.alltimets !== undefined) return toNumber(snap.alltimets);
+        if (snap.all_time_ts !== undefined) return toNumber(snap.all_time_ts);
+        return null;
+      };
+      const parseWeeklyTS = (snap: any): number => toNumber(snap?.weekly_ts);
+      const capByWeekly = (dailyValue: number, weeklyValue: number): number =>
+        Math.min(dailyValue, Math.max(0, weeklyValue));
+      const getUserSnap = (container: any) => container?.[dbUser] || container?.[username];
+      const calcDailyTS = (oldSnap: any, newSnap: any, capCurrent = false): number => {
+        const oldExp = parseTotalExp(oldSnap);
+        const newExp = parseTotalExp(newSnap);
+        if (oldExp === null || newExp === null) return 0;
+
+        const rawDiff = Math.max(0, newExp - oldExp);
+        const oldWeekly = parseWeeklyTS(oldSnap);
+        const newWeekly = parseWeeklyTS(newSnap);
+
+        if (capCurrent || (newWeekly > 0 && oldWeekly > 0 && newWeekly < oldWeekly)) {
+          return capByWeekly(rawDiff, newWeekly);
+        }
+
+        return rawDiff;
+      };
 
       const now = new Date();
       const formatter = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
@@ -177,10 +214,7 @@ export function useClanMemberData(username: string | undefined) {
           const lootDiff = newLoot - oldLoot;
           dailyHistory.push({ data: dateLabel, valor: Math.max(0, lootDiff) }); 
 
-          const oldTS = Number(oldSnap.alltimets) || Number(oldSnap.all_time_ts) || 0;
-          const newTS = Number(newSnap.alltimets) || Number(newSnap.all_time_ts) || 0;
-          const tsDiff = newTS - oldTS;
-          dailyTSHistory.push({ data: dateLabel, valor: Math.max(0, tsDiff) });
+          dailyTSHistory.push({ data: dateLabel, valor: calcDailyTS(oldSnap, newSnap, i === 7) });
         } else {
           dailyHistory.push({ data: dateLabel, valor: 0 });
           dailyTSHistory.push({ data: dateLabel, valor: 0 });
@@ -189,8 +223,9 @@ export function useClanMemberData(username: string | undefined) {
 
         // Optional: calculate local differences for graphs if needed.
       const currentAll = data.all_time_loots || 0;
-      const currentAllTimeTS = Number(data.alltimets) || Number(data.all_time_ts) || 0;
+      const currentTotalExp = toNumber(data.total_exp ?? data.totalexp ?? data.alltimets ?? data.all_time_ts);
       const weeklyLootsUser = data.weekly_loots || 0;
+      const weeklyTSUser = toNumber(data.weekly_ts);
       const allTimeClanLoots = data.all_time_clan_loots || 0;
 
       // Extract accurate 8AM baselines for the daily cards, using retroactive baseline
@@ -204,17 +239,21 @@ export function useClanMemberData(username: string | undefined) {
       if (allDailyData) {
         const allDailyDates = Object.keys(allDailyData).sort().filter(d => d <= yesterdayStr);
         const allDailyDatesWithToday = Object.keys(allDailyData).sort().filter(d => d <= adjustedTodayStr);
+        const todaySnap = getUserSnap(allDailyData[adjustedTodayStr]);
+        const todayLoot = parseLoot(todaySnap);
+        const todayExp = parseTotalExp(todaySnap);
+
+        if (todayLoot !== null) baselineLoot = todayLoot;
+        if (todayExp !== null) baselineExp = todayExp;
+
         for (let i = allDailyDates.length - 1; i >= 0; i--) {
-            const snap = allDailyData[allDailyDates[i]]?.[dbUser] || allDailyData[allDailyDates[i]]?.[username];
+            const snap = getUserSnap(allDailyData[allDailyDates[i]]);
             if (snap) {
               if (baselineLoot === null) {
-                    baselineLoot = snap.alltimeloot !== undefined ? Number(snap.alltimeloot) : (snap.all_time_loots !== undefined ? Number(snap.all_time_loots) : null);
+                    baselineLoot = parseLoot(snap);
                 }
                 if (baselineExp === null) {
-                    const snapExp = snap.alltimets !== undefined ? Number(snap.alltimets) : (snap.all_time_ts !== undefined ? Number(snap.all_time_ts) : null);
-                    if (snapExp !== null) {
-                        baselineExp = snapExp;
-                    }
+                    baselineExp = parseTotalExp(snap);
                 }
                 if (baselineLoot !== null && baselineExp !== null) {
                     break;
@@ -223,8 +262,8 @@ export function useClanMemberData(username: string | undefined) {
         }
 
         // Build weekly history from daily snapshots + current live profile (adjusted by 08:00 reset window)
-        const parseLoot = (snap: any) => Number(snap?.alltimeloot ?? snap?.all_time_loots ?? 0);
-        const parseTS = (snap: any) => Number(snap?.alltimets ?? snap?.all_time_ts ?? 0);
+        const parseLootValue = (snap: any) => parseLoot(snap) ?? 0;
+        const parseTSValue = (snap: any) => parseTotalExp(snap) ?? 0;
         const toWeekStart = (dateStr: string) => {
           const [y, m, d] = dateStr.split('-').map(Number);
           const date = new Date(y, m - 1, d);
@@ -235,11 +274,11 @@ export function useClanMemberData(username: string | undefined) {
 
         const userDailySnapshots = allDailyDatesWithToday
           .map((date) => {
-            const snap = allDailyData[date]?.[dbUser] || allDailyData[date]?.[username];
+            const snap = getUserSnap(allDailyData[date]);
             if (!snap) return null;
-            return { date, loot: parseLoot(snap), ts: parseTS(snap) };
+            return { date, loot: parseLootValue(snap), ts: parseTSValue(snap), snap };
           })
-          .filter((snap): snap is { date: string; loot: number; ts: number } => snap !== null);
+          .filter((snap): snap is { date: string; loot: number; ts: number; snap: any } => snap !== null);
 
         const dailyIntervals: { date: string; loot: number; ts: number }[] = [];
         for (let i = 0; i < userDailySnapshots.length - 1; i++) {
@@ -248,7 +287,7 @@ export function useClanMemberData(username: string | undefined) {
           dailyIntervals.push({
             date: oldSnap.date,
             loot: Math.max(0, newSnap.loot - oldSnap.loot),
-            ts: Math.max(0, newSnap.ts - oldSnap.ts),
+            ts: calcDailyTS(oldSnap.snap, newSnap.snap),
           });
         }
 
@@ -257,7 +296,7 @@ export function useClanMemberData(username: string | undefined) {
           dailyIntervals.push({
             date: adjustedTodayStr,
             loot: Math.max(0, currentAll - latestSnap.loot),
-            ts: Math.max(0, currentAllTimeTS - latestSnap.ts),
+            ts: calcDailyTS(latestSnap.snap, data, true),
           });
         }
 
@@ -288,11 +327,11 @@ export function useClanMemberData(username: string | undefined) {
         // Fallback se nÃ£o conseguiu baixar daily.json completo
         const todaySnap = snaps[7];
         baselineLoot = todaySnap ? (Number(todaySnap.alltimeloot) || Number(todaySnap.all_time_loots) || 0) : currentAll;
-        baselineExp = todaySnap ? (Number(todaySnap.alltimets) || Number(todaySnap.all_time_ts) || currentAllTimeTS) : currentAllTimeTS;
+        baselineExp = todaySnap ? (parseTotalExp(todaySnap) ?? currentTotalExp) : currentTotalExp;
       }
 
-      if (baselineLoot !== null) cardDailyLoot = Math.max(0, currentAll - baselineLoot);
-      if (baselineExp !== null) cardDailyTS = Math.max(0, currentAllTimeTS - baselineExp);
+      if (baselineLoot !== null) cardDailyLoot = capByWeekly(Math.max(0, currentAll - baselineLoot), weeklyLootsUser);
+      if (baselineExp !== null) cardDailyTS = capByWeekly(Math.max(0, currentTotalExp - baselineExp), weeklyTSUser);
       if (weeklyHistory.length === 0) {
         weeklyHistory = [{ semana: "Atual", total: weeklyLootsUser }];
       }

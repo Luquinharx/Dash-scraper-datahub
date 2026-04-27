@@ -5,15 +5,12 @@ import { Search, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, Flame, Chec
 import { Link } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { RankBadge } from '../RankBadge';
+import { formatCompactPtBR, formatSignedCompactPtBR } from '../../lib/format';
 
 type SortKey = keyof MemberProfile | 'daily_ts_calc' | 'rank';
 
 function toTitleCase(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-}
-
-function formatNumber(n: number): string {
-  return n.toLocaleString('pt-BR');
 }
 
 export default function EstatisticasTS() {
@@ -155,27 +152,27 @@ export default function EstatisticasTS() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-stone-200 font-sans">
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-4 md:py-8 space-y-8 animate-in fade-in duration-700">
+    <div className="min-h-screen bg-black text-zinc-200 font-sans">
+      <div className="page-shell w-full px-4 sm:px-6 lg:px-8 py-4 md:py-8 space-y-7">
 
         {/* Header */}
         <header className="flex flex-col md:flex-row md:items-end justify-between border-b border-white/10 pb-6 gap-6">
           <div className="relative">
-             <div className="absolute -left-10 top-0 w-1 h-full bg-red-600 hidden md:block"></div>
-            <h1 className="text-4xl md:text-5xl font-serif font-black text-white tracking-widest uppercase shadow-red-500/20 drop-shadow-lg">
-                Dash <span className="text-red-700">TS</span>
+             <div className="absolute -left-10 top-1 hidden h-12 w-px bg-red-500/70 md:block"></div>
+            <h1 className="text-3xl md:text-5xl font-semibold text-white uppercase">
+                Dash <span className="text-zinc-300">TS</span>
             </h1>
-            <p className="text-stone-500 mt-2 flex items-center gap-2 font-serif uppercase tracking-wider text-xs">
+            <p className="text-zinc-500 mt-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.12em]">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-30"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
               </span>
-              Last Update: <span className="text-stone-300 font-bold">{formatCollectedAt(latestCollectedAt)}</span>
+              Last Update: <span className="text-zinc-300 font-semibold">{formatCollectedAt(latestCollectedAt)}</span>
             </p>
           </div>
 
            <div className="flex items-center gap-3">
-              <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm text-xs font-serif font-bold tracking-widest uppercase border bg-red-950/20 text-red-400 border-red-900/40">
+              <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm text-xs font-semibold tracking-[0.12em] uppercase border bg-white/[0.04] text-zinc-300 border-white/10">
                 <CheckCircle2 className="w-4 h-4" /> Systems Operational ({profiles.length}/{profiles.length})
               </span>
             </div>
@@ -183,68 +180,68 @@ export default function EstatisticasTS() {
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-          <div className="bg-stone-900/50 border border-white/5 rounded-sm p-6 shadow-lg backdrop-blur-sm group hover:border-red-900/30 transition-all">        
+          <div className="soft-card rounded-sm p-6 group">        
             <div className="flex items-center gap-5">
-              <div className="p-4 bg-black border border-white/10 rounded-sm text-stone-400 group-hover:text-red-500 transition-colors">
+              <div className="p-4 bg-black border border-white/10 rounded-sm text-zinc-400 group-hover:text-white transition-colors">
                 <Users className="w-8 h-8" />
               </div>
               <div>
-                <p className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">Tracked Members</p>
-                <p className="text-3xl font-serif font-black text-white mt-1">{profiles.length}</p>
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">Tracked Members</p>
+                <p className="text-3xl font-semibold text-white mt-1">{profiles.length}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-stone-900/50 border border-white/5 rounded-sm p-6 shadow-lg backdrop-blur-sm group hover:border-sky-900/30 transition-all">        
+          <div className="soft-card rounded-sm p-6 group">        
              <div className="flex items-center gap-5">
-              <div className="p-4 bg-black border border-white/10 rounded-sm text-stone-400 group-hover:text-sky-500 transition-colors">
+              <div className="p-4 bg-black border border-white/10 rounded-sm text-zinc-400 group-hover:text-sky-500 transition-colors">
                 <TrendingUp className="w-8 h-8" />
               </div>
               <div>
-                <p className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">Total Daily TS</p>
-                <p className="text-2xl font-serif font-black text-white mt-1 text-sky-500 drop-shadow-[0_0_8px_rgba(14,165,233,0.5)]">
-                    +{(totalDailyTS > 0 ? totalDailyTS : 0).toLocaleString('pt-BR')}
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">Total Daily TS</p>
+                <p className="text-2xl font-semibold text-sky-400 mt-1">
+                    {formatSignedCompactPtBR(totalDailyTS > 0 ? totalDailyTS : 0)}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-stone-900/50 border border-white/5 rounded-sm p-6 shadow-lg backdrop-blur-sm group hover:border-red-900/30 transition-all">        
+          <div className="soft-card rounded-sm p-6 group">        
              <div className="flex items-center gap-5">
-              <div className="p-4 bg-black border border-white/10 rounded-sm text-stone-400 group-hover:text-red-500 transition-colors">
+              <div className="p-4 bg-black border border-white/10 rounded-sm text-zinc-400 group-hover:text-red-500 transition-colors">
                 <TrendingUp className="w-8 h-8" />
               </div>
               <div>
-                <p className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">Total Weekly TS</p>
-                <p className="text-2xl font-serif font-black text-white mt-1 text-red-500 drop-shadow-[0_0_8px_rgba(220,38,38,0.5)]">
-                    +{totalWeeklyTS.toLocaleString('pt-BR')}
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">Total Weekly TS</p>
+                <p className="text-2xl font-semibold text-white mt-1">
+                    {formatSignedCompactPtBR(totalWeeklyTS)}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-stone-900/50 border border-white/5 rounded-sm p-6 shadow-lg backdrop-blur-sm group hover:border-emerald-900/30 transition-all">        
+          <div className="soft-card rounded-sm p-6 group">        
              <div className="flex items-center gap-5">
-              <div className="p-4 bg-black border border-white/10 rounded-sm text-stone-400 group-hover:text-emerald-500 transition-colors">
+              <div className="p-4 bg-black border border-white/10 rounded-sm text-zinc-400 group-hover:text-emerald-500 transition-colors">
                 <TrendingUp className="w-8 h-8" />
               </div>
               <div>
-                <p className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">Total All Time TS</p>
-                <p className="text-2xl font-serif font-black text-white mt-1 text-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]">
-                    +{totalAllTimeTS.toLocaleString('pt-BR')}
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">Total All Time TS</p>
+                <p className="text-2xl font-semibold text-emerald-400 mt-1">
+                    {formatSignedCompactPtBR(totalAllTimeTS)}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-stone-900/50 border border-white/5 rounded-sm p-6 shadow-lg backdrop-blur-sm group hover:border-red-900/30 transition-all">        
+          <div className="soft-card rounded-sm p-6 group">        
              <div className="flex items-center gap-5">
-              <div className="p-4 bg-black border border-white/10 rounded-sm text-stone-400 group-hover:text-red-500 transition-colors">
+              <div className="p-4 bg-black border border-white/10 rounded-sm text-zinc-400 group-hover:text-red-500 transition-colors">
                 <Flame className="w-8 h-8" />
               </div>
               <div>
-                <p className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">Top Earner</p>
-                <p className="text-2xl font-serif font-black text-white mt-1 truncate max-w-[120px]" title={topEarner?.username}>
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">Top Earner</p>
+                <p className="text-2xl font-semibold text-white mt-1 truncate max-w-[120px]" title={topEarner?.username}>
                   {topEarner?.username || '-'}
                 </p>
               </div>
@@ -255,7 +252,7 @@ export default function EstatisticasTS() {
         {/* Top 3 Weekly Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {topEarnerData.map((earner) => (
-            <div key={earner.username} className="bg-stone-950 border border-white/10 rounded-sm p-6 shadow-lg backdrop-blur-sm hover:border-red-900/30 transition-all">
+            <div key={earner.username} className="soft-card rounded-sm p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className={cn(
                   "flex items-center justify-center w-10 h-10 rounded-sm text-sm font-bold",
@@ -265,25 +262,25 @@ export default function EstatisticasTS() {
                 )}>
                   {earner.rank === 1 ? '🥇' : earner.rank === 2 ? '🥈' : '🥉'}
                 </div>
-                <span className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">Position {earner.rank}</span>
+                <span className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">Position {earner.rank}</span>
               </div>
-              <p className="text-sm text-stone-400 truncate mb-2">{earner.username}</p>
-              <p className="text-2xl font-mono font-bold text-red-500">{earner.weekly_ts.toLocaleString('pt-BR')}</p>
-              <p className="text-xs text-stone-600 mt-2">Weekly TS</p>
+              <p className="text-sm text-zinc-400 truncate mb-2">{earner.username}</p>
+              <p className="text-2xl font-mono font-bold text-white">{earner.weekly_ts.toLocaleString('pt-BR')}</p>
+              <p className="text-xs text-zinc-600 mt-2">Weekly TS</p>
             </div>
           ))}
         </div>
 
         {/* Controls */}
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-black border-y border-white/10 py-4">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 border-y border-white/10 bg-black/40 py-4">
           <div className="relative w-full sm:w-96">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
             <input
               type="text"
               placeholder="SEARCH OPERATIVE..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-stone-950 border border-white/10 rounded-sm text-white placeholder:text-stone-600 focus:outline-none focus:ring-1 focus:ring-red-900 focus:border-red-900 transition-all font-mono text-sm uppercase tracking-wider"
+              className="w-full pl-10 pr-4 py-3 bg-zinc-950/80 border border-white/10 rounded-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-white/20 focus:border-white/20 transition-all font-mono text-sm uppercase tracking-wider"
             />
           </div>
 
@@ -291,10 +288,10 @@ export default function EstatisticasTS() {
             <button
               onClick={() => setFilterMode('all')}
               className={cn(
-                "px-4 py-2 rounded-sm text-xs font-serif font-bold uppercase tracking-widest transition-all",
+                "px-4 py-2 rounded-sm text-xs font-semibold uppercase tracking-[0.12em] transition-all",
                 filterMode === 'all'
-                  ? "bg-red-600 text-white shadow-lg shadow-red-600/50"
-                  : "bg-stone-800 text-stone-400 hover:bg-stone-700"
+                  ? "bg-white text-black"
+                  : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white"
               )}
             >
               All
@@ -302,10 +299,10 @@ export default function EstatisticasTS() {
             <button
               onClick={() => setFilterMode('active')}
               className={cn(
-                "px-4 py-2 rounded-sm text-xs font-serif font-bold uppercase tracking-widest transition-all",
+                "px-4 py-2 rounded-sm text-xs font-semibold uppercase tracking-[0.12em] transition-all",
                 filterMode === 'active'
                   ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/50"
-                  : "bg-stone-800 text-stone-400 hover:bg-stone-700"
+                  : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white"
               )}
             >
               Active
@@ -313,10 +310,10 @@ export default function EstatisticasTS() {
             <button
               onClick={() => setFilterMode('inactive')}
               className={cn(
-                "px-4 py-2 rounded-sm text-xs font-serif font-bold uppercase tracking-widest transition-all",
+                "px-4 py-2 rounded-sm text-xs font-semibold uppercase tracking-[0.12em] transition-all",
                 filterMode === 'inactive'
-                  ? "bg-red-600/70 text-white shadow-lg shadow-red-600/50"
-                  : "bg-stone-800 text-stone-400 hover:bg-stone-700"
+                  ? "bg-zinc-200 text-black"
+                  : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white"
               )}
             >
               Inactive
@@ -325,10 +322,10 @@ export default function EstatisticasTS() {
         </div>
 
         {/* Table */}
-        <div className="bg-stone-950 border border-white/10 rounded-sm shadow-2xl overflow-hidden backdrop-blur-sm">
+        <div className="surface-panel rounded-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="text-xs text-stone-500 uppercase bg-black border-b border-white/10 font-serif tracking-widest">
+              <thead className="text-xs text-zinc-500 uppercase bg-black/70 border-b border-white/10 font-sans tracking-[0.12em]">
                 <tr>
                   <th className="px-6 py-5 font-bold">Username</th>
                   <th className="px-6 py-5 font-bold text-right cursor-pointer hover:text-white transition-colors select-none group hidden md:table-cell" onClick={() => handleSort('rank')}>
@@ -356,37 +353,37 @@ export default function EstatisticasTS() {
                   const absoluteIdx = (currentPage - 1) * itemsPerPage + idx;   
                   const isHighlight = (p.weekly_ts > 5000);
 
-                  const weeklyTSClass = p.weekly_ts > 10000 ? "text-emerald-500" : p.weekly_ts > 5000 ? "text-red-500" : "text-stone-600";
-                  const clanWeeklyClass = p.clan_weekly_ts > 5000 ? "text-emerald-500" : p.clan_weekly_ts > 0 ? "text-stone-300" : "text-stone-600";
-                  const allTimeTSClass = p.all_time_ts > 50000000 ? "text-emerald-400" : "text-stone-300";
+                  const weeklyTSClass = p.weekly_ts > 10000 ? "text-emerald-500" : p.weekly_ts > 5000 ? "text-zinc-100" : "text-zinc-600";
+                  const clanWeeklyClass = p.clan_weekly_ts > 5000 ? "text-emerald-500" : p.clan_weekly_ts > 0 ? "text-zinc-300" : "text-zinc-600";
+                  const allTimeTSClass = p.all_time_ts > 50000000 ? "text-emerald-400" : "text-zinc-300";
 
                   const clanMember = clanData.find(d => d.username.toLowerCase() === p.username.toLowerCase());
                   const rank = clanMember?.rank || 'Street Cleaner';
 
                   const dailyTS = clanMember?.dailyTS || 0;
-                  const dailyTSClass = dailyTS > 0 ? "text-sky-500" : dailyTS < 0 ? "text-red-500" : "text-stone-600";
-                  const dailyTSText = (dailyTS >= 0 ? '+' : '') + formatNumber(dailyTS);
+                  const dailyTSClass = dailyTS > 0 ? "text-sky-500" : dailyTS < 0 ? "text-red-500" : "text-zinc-600";
+                  const dailyTSText = formatSignedCompactPtBR(dailyTS);
 
                   return (
                     <tr
                       key={p.username}
                       className={cn(
                         "transition-colors hover:bg-white/5",
-                        isHighlight && "bg-red-950/10 hover:bg-red-950/20"
+                        isHighlight && "bg-white/[0.035] hover:bg-white/[0.06]"
                       )}
                     >
                       <td className="px-6 py-4 font-bold text-white whitespace-nowrap flex items-center gap-3">
-                        <span className="text-stone-600 w-6 text-xs text-right font-serif">{absoluteIdx + 1}.</span>
+                        <span className="text-zinc-600 w-6 text-xs text-right font-mono">{absoluteIdx + 1}.</span>
                         <span className={cn(
                           "inline-block w-1.5 h-1.5 rotate-45 flex-shrink-0",
-                          "bg-red-500 shadow-[0_0_5px_red]"
+                          "bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.7)]"
                         )} title="Updated" />
-                        <Link to={`/dashboard?user=${encodeURIComponent(p.username)}`} className="tracking-wide hover:text-red-500 hover:underline transition-all">
+                        <Link to={`/dashboard?user=${encodeURIComponent(p.username)}`} className="tracking-wide hover:text-white hover:underline transition-all">
                             {toTitleCase(p.username)}
                         </Link>
                         {isHighlight && <Flame className="w-3.5 h-3.5 text-red-600" />}
                       </td>
-                      <td className="px-6 py-4 text-right text-stone-300 hidden md:table-cell">
+                      <td className="px-6 py-4 text-right text-zinc-300 hidden md:table-cell">
                         <RankBadge rank={rank} />
                       </td>
                       <td className={cn(
@@ -399,8 +396,8 @@ export default function EstatisticasTS() {
                         "px-6 py-4 text-right font-bold",
                         weeklyTSClass
                       )}>
-                        <span className="font-mono font-bold bg-red-500/10 px-3 py-1 rounded-sm border border-red-500/20">
-                          {formatNumber(p.weekly_ts)}
+                        <span className="font-mono font-bold bg-white/[0.04] px-3 py-1 rounded-sm border border-white/10">
+                          {formatCompactPtBR(p.weekly_ts)}
                         </span>
                       </td>
 
@@ -408,25 +405,25 @@ export default function EstatisticasTS() {
                         "px-6 py-4 text-right font-mono hidden sm:table-cell",
                         clanWeeklyClass
                       )}>
-                        {formatNumber(p.clan_weekly_ts)}
+                        {formatCompactPtBR(p.clan_weekly_ts)}
                       </td>
 
                       <td className={cn(
                         "px-6 py-4 text-right font-mono hidden lg:table-cell",
                         allTimeTSClass
                       )}>
-                        {formatNumber(p.all_time_ts)}
+                        {formatCompactPtBR(p.all_time_ts)}
                       </td>
 
-                      <td className="px-6 py-4 text-right font-mono text-red-600 font-bold hidden xl:table-cell text-sm">
-                        {formatNumber(p.total_exp)}
+                      <td className="px-6 py-4 text-right font-mono text-zinc-400 font-bold hidden xl:table-cell text-sm">
+                        {formatCompactPtBR(p.total_exp)}
                       </td>
                     </tr>
                   );
                 })}
                 {paginatedProfiles.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-stone-600 font-serif uppercase tracking-widest">
+                    <td colSpan={7} className="px-6 py-12 text-center text-zinc-600 font-sans uppercase tracking-[0.12em]">
                       No operatives found.
                     </td>
                   </tr>
@@ -436,22 +433,22 @@ export default function EstatisticasTS() {
           </div>
 
           {totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row justify-between items-center bg-black border-t border-white/10 px-6 py-4 gap-4">
-              <span className="text-xs font-serif uppercase tracking-widest text-stone-500">
+            <div className="flex flex-col sm:flex-row justify-between items-center bg-black/70 border-t border-white/10 px-6 py-4 gap-4">
+              <span className="text-xs font-sans uppercase tracking-[0.12em] text-zinc-500">
                 Página {currentPage} de {totalPages}
               </span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}       
                   disabled={currentPage === 1}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-stone-900 border border-white/10 rounded-sm text-xs font-serif font-bold uppercase tracking-widest text-stone-400 hover:text-white hover:border-red-900 hover:bg-stone-950 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-zinc-900 border border-white/10 rounded-sm text-xs font-semibold uppercase tracking-[0.12em] text-zinc-400 hover:text-white hover:border-white/20 hover:bg-zinc-950 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronLeft className="w-4 h-4" /> Previous
                 </button>
                 <button
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-stone-900 border border-white/10 rounded-sm text-xs font-serif font-bold uppercase tracking-widest text-stone-400 hover:text-white hover:border-red-900 hover:bg-stone-950 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-zinc-900 border border-white/10 rounded-sm text-xs font-semibold uppercase tracking-[0.12em] text-zinc-400 hover:text-white hover:border-white/20 hover:bg-zinc-950 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Next <ChevronRight className="w-4 h-4" />
                 </button>

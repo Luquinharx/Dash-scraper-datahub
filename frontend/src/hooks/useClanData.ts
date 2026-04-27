@@ -96,6 +96,8 @@ export function useClanData() {
         const totalMinutes = (Number.isFinite(hh) ? hh : 0) * 60 + (Number.isFinite(mm) ? mm : 0);
         return Math.abs(totalMinutes - (8 * 60));
       };
+      const capByWeekly = (dailyValue: number, weeklyValue: number): number =>
+        Math.min(dailyValue, Math.max(0, weeklyValue));
 
       const now = new Date();
       const formatter = new Intl.DateTimeFormat('en-US', {
@@ -187,21 +189,13 @@ export function useClanData() {
         const clanAllTime = toNumber(val.all_time_clan_loots);
         const currentTS = toNumber(val.alltimets ?? val.all_time_ts ?? 0);
         const currentTotalExp = toNumber(val.total_exp ?? val.totalexp ?? val.alltimets ?? val.all_time_ts ?? 0);
+        const weeklyLoot = toNumber(val.weekly_loots);
+        const weeklyTS = toNumber(val.weekly_ts);
 
         let baselineLoot: number | null = null;
         let baselineExp: number | null = null;
 
-        // Daily loot baseline stays based on most recent completed day snapshots.
-        for (let i = dailyDates.length - 1; i >= 0; i--) {
-          const snap = getSnapForUser(dailyData[dailyDates[i]]);
-          const loot = parseLootFromSnap(snap);
-          if (loot !== null) {
-            baselineLoot = loot;
-            break;
-          }
-        }
-
-        // Daily TS baseline: use snapshot closest to 08:00 for current adjusted day.
+        // Daily baseline: use snapshot closest to 08:00 for current adjusted day.
         const todayCandidateMap = new Map<string, any>();
         const addCandidate = (key: string, snap: any) => {
           if (!snap || typeof snap !== 'object') return;
@@ -224,22 +218,41 @@ export function useClanData() {
           }
         });
 
-        let bestExp: number | null = null;
-        let bestDistance = Number.MAX_SAFE_INTEGER;
-        todayCandidateMap.forEach((snap) => {
-          const exp = parseTotalExpFromSnap(snap);
-          if (exp === null) return;
-          const distance = distanceTo8AM(snap?.collected_at);
-          if (distance < bestDistance) {
-            bestDistance = distance;
-            bestExp = exp;
-          }
-        });
+        const pickClosestTodayValue = (
+          parser: (snap: any) => number | null,
+          maxDistanceMinutes = Number.MAX_SAFE_INTEGER
+        ): number | null => {
+          let bestValue: number | null = null;
+          let bestDistance = Number.MAX_SAFE_INTEGER;
 
-        // Only use today's baseline when it is reasonably close to 08:00.
+          todayCandidateMap.forEach((snap) => {
+            const value = parser(snap);
+            if (value === null) return;
+            const distance = distanceTo8AM(snap?.collected_at);
+            if (distance < bestDistance) {
+              bestDistance = distance;
+              bestValue = value;
+            }
+          });
+
+          if (bestDistance > maxDistanceMinutes) return null;
+          return bestValue;
+        };
+
+        baselineLoot = pickClosestTodayValue(parseLootFromSnap);
+        // Only use today's TS baseline when it is reasonably close to 08:00.
         // Otherwise, fallback to the latest completed day to avoid zeroing Daily TS.
-        if (bestExp !== null && bestDistance <= DAILY_TS_BASELINE_WINDOW_MINUTES) {
-          baselineExp = bestExp;
+        baselineExp = pickClosestTodayValue(parseTotalExpFromSnap, DAILY_TS_BASELINE_WINDOW_MINUTES);
+
+        if (baselineLoot === null) {
+          for (let i = dailyDates.length - 1; i >= 0; i--) {
+            const snap = getSnapForUser(dailyData[dailyDates[i]]);
+            const loot = parseLootFromSnap(snap);
+            if (loot !== null) {
+              baselineLoot = loot;
+              break;
+            }
+          }
         }
 
         if (baselineExp === null) {
@@ -253,10 +266,10 @@ export function useClanData() {
           }
         }
 
-        const dailyLoot = baselineLoot !== null ? Math.max(0, currentAll - baselineLoot) : 0;
-        const dailyTS = baselineExp !== null ? Math.max(0, currentTotalExp - baselineExp) : 0;
-
-        const weeklyLoot = toNumber(val.weekly_loots);
+        const rawDailyLoot = baselineLoot !== null ? Math.max(0, currentAll - baselineLoot) : 0;
+        const rawDailyTS = baselineExp !== null ? Math.max(0, currentTotalExp - baselineExp) : 0;
+        const dailyLoot = capByWeekly(rawDailyLoot, weeklyLoot);
+        const dailyTS = capByWeekly(rawDailyTS, weeklyTS);
         const clanWeeklyLoot = toNumber(val.clan_weekly_loots);
 
         let months = 0;

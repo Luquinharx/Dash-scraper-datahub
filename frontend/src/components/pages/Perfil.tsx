@@ -83,7 +83,7 @@ export default function Perfil() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-black font-serif">
+      <div className="min-h-screen bg-black font-sans">
         <div className="flex items-center justify-center h-[80vh] text-red-900 animate-pulse uppercase tracking-widest">Loading Profile...</div>
       </div>
     );
@@ -92,33 +92,33 @@ export default function Perfil() {
   const dataEntrada = formatDatePtBR(profile.dataEntrada);
 
   return (
-    <div className="min-h-screen bg-black text-stone-300 font-serif selection:bg-red-900/30">
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 mx-auto space-y-8 animate-in fade-in duration-700">
+    <div className="min-h-screen bg-black text-zinc-300 font-sans selection:bg-red-900/30">
+      <div className="page-shell w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 mx-auto space-y-8">
 
         <header className="flex items-center gap-4 border-b border-white/10 pb-6">
-          <div className="p-3 bg-red-950/20 rounded-sm border border-red-900/30 text-red-600 shadow-[0_0_15px_rgba(220,38,38,0.2)]">
+          <div className="p-3 bg-white/[0.04] rounded-sm border border-white/10 text-zinc-300">
             <User className="w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-white tracking-widest uppercase">
-              Operative <span className="text-red-600">Profile</span>
+            <h1 className="text-3xl md:text-4xl font-semibold text-white uppercase">
+              Operative <span className="text-zinc-300">Profile</span>
             </h1>
-            <p className="text-stone-500 text-sm tracking-wide font-mono mt-1">{profile.email}</p>
+            <p className="text-zinc-500 text-sm font-mono mt-1">{profile.email}</p>
           </div>
         </header>
 
-        <div className="bg-stone-950/50 border border-white/10 rounded-sm p-6 backdrop-blur-sm relative overflow-hidden group">
+        <div className="surface-panel rounded-sm p-6 relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
             <Dna className="w-40 h-40 text-red-600" />
           </div>
 
           <div className="flex items-center justify-between mb-8 relative z-10">
-            <h2 className="text-xl font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <h2 className="text-xl font-semibold text-white uppercase flex items-center gap-2">
               <span className="w-1 h-6 bg-red-600 block"></span>
               Personal Data
             </h2>
             {!editing ? (
-              <button onClick={() => setEditing(true)} className="flex items-center gap-2 text-xs uppercase tracking-widest text-red-500 hover:text-red-400 transition-colors border border-red-900/30 px-3 py-1.5 rounded-sm hover:bg-red-950/20">
+              <button onClick={() => setEditing(true)} className="flex items-center gap-2 text-xs uppercase tracking-[0.12em] text-zinc-300 hover:text-white transition-colors border border-white/10 px-3 py-1.5 rounded-sm hover:bg-white/[0.06]">
                 <Edit3 className="w-3 h-3" /> Edit
               </button>
             ) : (
@@ -135,64 +135,64 @@ export default function Perfil() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
             <div className="space-y-2">
-              <label className="text-xs text-red-700/70 uppercase tracking-widest font-bold">Codename (Nick)</label>
+              <label className="text-xs text-zinc-500 uppercase tracking-[0.12em] font-bold">Codename (Nick)</label>
               {editing ? (
-                <input value={nick} onChange={e => setNick(e.target.value)} className="w-full px-4 py-2 bg-black border border-red-900/30 text-white focus:outline-none focus:border-red-500 transition-colors font-mono" />
+                <input value={nick} onChange={e => setNick(e.target.value)} className="w-full px-4 py-2 bg-black border border-white/10 text-white focus:outline-none focus:border-white/30 transition-colors font-mono" />
               ) : (
-                <p className="text-xl text-white font-serif tracking-wide border-b border-white/5 pb-1">{profile.nick}</p>
+                <p className="text-xl text-white font-semibold border-b border-white/5 pb-1">{profile.nick}</p>
               )}
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-red-700/70 uppercase tracking-widest font-bold">Comms (Discord)</label>
+              <label className="text-xs text-zinc-500 uppercase tracking-[0.12em] font-bold">Comms (Discord)</label>
               {editing ? (
-                <input value={discord} onChange={e => setDiscord(e.target.value)} className="w-full px-4 py-2 bg-black border border-red-900/30 text-white focus:outline-none focus:border-red-500 transition-colors font-mono" />
+                <input value={discord} onChange={e => setDiscord(e.target.value)} className="w-full px-4 py-2 bg-black border border-white/10 text-white focus:outline-none focus:border-white/30 transition-colors font-mono" />
               ) : (
-                <p className="text-xl text-white font-serif tracking-wide border-b border-white/5 pb-1">{profile.discord}</p>
+                <p className="text-xl text-white font-semibold border-b border-white/5 pb-1">{profile.discord}</p>
               )}
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-stone-600 uppercase tracking-widest font-bold flex items-center gap-2">Access</label>
-              <p className="text-lg text-stone-300 font-serif border-b border-white/5 pb-1">{profile.cargo}</p>
+              <label className="text-xs text-zinc-600 uppercase tracking-[0.12em] font-bold flex items-center gap-2">Access</label>
+              <p className="text-lg text-zinc-300 font-semibold border-b border-white/5 pb-1">{profile.cargo}</p>
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-stone-600 uppercase tracking-widest font-bold">Scrap Rank</label>
+              <label className="text-xs text-zinc-600 uppercase tracking-[0.12em] font-bold">Scrap Rank</label>
               <div className="border-b border-white/5 pb-1">
                 <RankBadge rank={profiles.find(p => p.username === profile.nickJogo)?.rank || 'Street Cleaner'} />
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-stone-600 uppercase tracking-widest font-bold">Linked Operative</label>
-              <p className="text-lg text-stone-300 font-serif border-b border-white/5 pb-1">{profile.nickJogo || <span className="text-stone-600 italic">Not Linked</span>}</p>
+              <label className="text-xs text-zinc-600 uppercase tracking-[0.12em] font-bold">Linked Operative</label>
+              <p className="text-lg text-zinc-300 font-semibold border-b border-white/5 pb-1">{profile.nickJogo || <span className="text-zinc-600 italic">Not Linked</span>}</p>
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-stone-600 uppercase tracking-widest font-bold">Enlistment Date</label>
-              <p className="text-lg text-stone-300 font-mono border-b border-white/5 pb-1">{dataEntrada}</p>
+              <label className="text-xs text-zinc-600 uppercase tracking-[0.12em] font-bold">Enlistment Date</label>
+              <p className="text-lg text-zinc-300 font-mono border-b border-white/5 pb-1">{dataEntrada}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 pt-6 border-t border-white/5 relative z-10">
-            <div className="text-center p-4 bg-black/40 border border-white/5 rounded-sm">
-              <p className="text-[10px] text-stone-500 uppercase tracking-[0.2em] mb-2">Total Loot</p>
+            <div className="text-center p-4 bg-black/40 border border-white/10 rounded-sm">
+              <p className="text-[10px] text-zinc-500 uppercase tracking-[0.16em] mb-2">Total Loot</p>
               <p className="text-2xl font-bold text-white font-mono">
                 {(firestoreData.baseLoot + (stats ? stats.weeklyValues.reduce((a, b) => a + b, 0) + stats.weeklyToDate : 0)).toLocaleString('pt-BR')}
               </p>
             </div>
-            <div className="text-center p-4 bg-black/40 border border-white/5 rounded-sm">
-              <p className="text-[10px] text-stone-500 uppercase tracking-[0.2em] mb-2">Donated</p>
-              <p className="text-2xl font-bold text-emerald-500 font-mono drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]">
+            <div className="text-center p-4 bg-black/40 border border-white/10 rounded-sm">
+              <p className="text-[10px] text-zinc-500 uppercase tracking-[0.16em] mb-2">Donated</p>
+              <p className="text-2xl font-bold text-emerald-500 font-mono">
                 ${firestoreData.donatedCash.toLocaleString('pt-BR')}
               </p>
               {firestoreData.donatedCredits > 0 && <p className="text-sm font-bold text-purple-400 mt-1">{firestoreData.donatedCredits} CR</p>}
             </div>
-            <div className="text-center p-4 bg-black/40 border border-white/5 rounded-sm">
-              <p className="text-[10px] text-stone-500 uppercase tracking-[0.2em] mb-2">Weekly Loot</p>
-              <p className="text-2xl font-bold text-red-500 font-mono drop-shadow-[0_0_8px_rgba(220,38,38,0.5)]">
+            <div className="text-center p-4 bg-black/40 border border-white/10 rounded-sm">
+              <p className="text-[10px] text-zinc-500 uppercase tracking-[0.16em] mb-2">Weekly Loot</p>
+              <p className="text-2xl font-bold text-white font-mono">
                 {(stats?.weeklyToDate || 0).toLocaleString('pt-BR')}
               </p>
             </div>
-            <div className="text-center p-4 bg-black/40 border border-white/5 rounded-sm">
-              <p className="text-[10px] text-stone-500 uppercase tracking-[0.2em] mb-2">Daily Loot</p>
-              <p className="text-2xl font-bold text-stone-300 font-mono">
+            <div className="text-center p-4 bg-black/40 border border-white/10 rounded-sm">
+              <p className="text-[10px] text-zinc-500 uppercase tracking-[0.16em] mb-2">Daily Loot</p>
+              <p className="text-2xl font-bold text-zinc-300 font-mono">
                 +{(stats?.dailyLoot || 0).toLocaleString('pt-BR')}
               </p>
             </div>
@@ -200,10 +200,10 @@ export default function Perfil() {
         </div>
 
         {stats && stats.dailyHistory.length > 0 && (
-          <div className="bg-stone-950/50 border border-white/10 rounded-sm overflow-hidden backdrop-blur-sm">
+          <div className="surface-panel rounded-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-white/10 bg-black/40 flex items-center gap-2">
               <span className="w-1 h-5 bg-stone-600 block"></span>
-              <h2 className="text-sm font-bold text-white uppercase tracking-widest">Loot History</h2>
+              <h2 className="text-sm font-semibold text-white uppercase tracking-[0.12em]">Loot History</h2>
             </div>
             <div className="max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-stone-800 scrollbar-track-black">
               <table className="w-full text-sm font-mono">
@@ -217,7 +217,7 @@ export default function Perfil() {
                   {[...stats.dailyHistory].reverse().map((l, i) => (
                     <tr key={i} className="hover:bg-white/5 transition-colors">
                       <td className="px-6 py-3 text-stone-400">{l.data}</td>
-                      <td className="px-6 py-3 text-right text-red-400 font-bold drop-shadow-[0_0_5px_rgba(220,38,38,0.3)]">+{l.valor.toLocaleString('pt-BR')}</td>
+                      <td className="px-6 py-3 text-right text-emerald-500 font-bold">+{l.valor.toLocaleString('pt-BR')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -226,10 +226,10 @@ export default function Perfil() {
           </div>
         )}
 
-        <div className="bg-stone-950/50 border border-white/10 rounded-sm overflow-hidden backdrop-blur-sm">
+        <div className="surface-panel rounded-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-white/10 bg-black/40 flex items-center gap-2">
             <span className="w-1 h-5 bg-red-600 block"></span>
-            <h2 className="text-sm font-bold text-white uppercase tracking-widest">Slot History</h2>
+            <h2 className="text-sm font-semibold text-white uppercase tracking-[0.12em]">Slot History</h2>
           </div>
           {roletas.length > 0 ? (
             <div className="overflow-x-auto">

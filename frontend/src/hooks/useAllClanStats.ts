@@ -2,6 +2,14 @@ import { useState, useEffect } from 'react';
 import { onValue, ref } from 'firebase/database';
 import { rtdb } from '../lib/firebase';
 import { useClanData } from './useClanData';
+import {
+  getLatestBankRunLabel,
+  isDonationExcluded,
+  normalizeBankRuns,
+  normalizeBankUsername,
+  type BankLogsMeta,
+  type RawBankRun,
+} from '../lib/bankLogs';
 
 export interface ClanMemberStat {
   username: string;
@@ -19,58 +27,13 @@ export interface ClanMemberStat {
 type ExclusionMap = Record<string, boolean>;
 type HiddenUsersMap = Record<string, boolean>;
 
-interface BankLogFields {
-  action?: string;
-  currency?: string;
-  time?: string;
-  username?: string;
-}
-
-interface BankLogEntry {
-  fields?: BankLogFields;
-  ingested_at?: string;
-}
-
-interface BankRun {
-  bank?: Record<string, BankLogEntry> | BankLogEntry[];
-}
-
-function parseAmountFromCurrency(currency: string): number {
-  const digits = (currency || '').replace(/\D/g, '');
-  return Number(digits || 0);
-}
-
-function normalizeUsername(value: string): string {
-  return (value || '').trim().toLowerCase();
-}
-
-function toPtBrDateTime(timestampMs: number): string {
-  if (!Number.isFinite(timestampMs) || timestampMs <= 0) return 'Indisponivel';
-  return new Date(timestampMs).toLocaleString('pt-BR', {
-    timeZone: 'America/Sao_Paulo',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function getBankEntries(run: BankRun): Array<[string, BankLogEntry]> {
-  const bank = run?.bank;
-  if (!bank) return [];
-  if (Array.isArray(bank)) {
-    return bank.map((entry, index) => [String(index), entry]);
-  }
-  return Object.entries(bank);
-}
-
 export function useAllClanStats() {
   const [stats, setStats] = useState<ClanMemberStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdatedUrl, setLastUpdatedUrl] = useState<string>('');
   const { data: scraperData, loading: scraperLoading } = useClanData();
-  const [bankData, setBankData] = useState<Record<string, BankRun> | null>(null);
+  const [bankData, setBankData] = useState<Record<string, RawBankRun> | null>(null);
+  const [bankMeta, setBankMeta] = useState<BankLogsMeta | null>(null);
   const [exclusionMap, setExclusionMap] = useState<ExclusionMap>({});
   const [hiddenUsersMap, setHiddenUsersMap] = useState<HiddenUsersMap>({});
 
@@ -81,12 +44,25 @@ export function useAllClanStats() {
       ref(rtdb, 'clan_logs/runs'),
       (snapshot) => {
         if (!mounted) return;
-        setBankData((snapshot.val() || {}) as Record<string, BankRun>);
+        setBankData((snapshot.val() || {}) as Record<string, RawBankRun>);
       },
       (error) => {
         console.error('Failed to listen clan_logs/runs:', error);
         if (!mounted) return;
         setBankData({});
+      }
+    );
+
+    const unsubscribeMeta = onValue(
+      ref(rtdb, 'clan_logs_meta/latest_run'),
+      (snapshot) => {
+        if (!mounted) return;
+        setBankMeta(snapshot.val() as BankLogsMeta | null);
+      },
+      (error) => {
+        console.error('Failed to listen clan_logs_meta/latest_run:', error);
+        if (!mounted) return;
+        setBankMeta(null);
       }
     );
 
@@ -117,7 +93,7 @@ export function useAllClanStats() {
           } catch {
             decodedKey = rawKey;
           }
-          normalizedHiddenUsers[normalizeUsername(decodedKey)] = true;
+          normalizedHiddenUsers[normalizeBankUsername(decodedKey)] = true;
         });
         setHiddenUsersMap(normalizedHiddenUsers);
       },
@@ -131,6 +107,7 @@ export function useAllClanStats() {
     return () => {
       mounted = false;
       unsubscribeRuns();
+      unsubscribeMeta();
       unsubscribeExclusions();
       unsubscribeHiddenUsers();
     };
@@ -143,45 +120,25 @@ export function useAllClanStats() {
       try {
         const donatedCashMap: Record<string, number> = {};
         const donatedCreditsMap: Record<string, number> = {};
-        let maxTimestamp = 0;
+        const bankEntries = normalizeBankRuns(bankData);
 
-        Object.entries(bankData).forEach(([runId, run]) => {
-          getBankEntries(run).forEach(([entryId, entry]) => {
-            const fields = entry?.fields;
-            if (!fields) return;
+        bankEntries.forEach((entry) => {
+          if (entry.action !== 'give') return;
+          if (!entry.username) return;
+          if (isDonationExcluded(entry, exclusionMap)) return;
+          if (hiddenUsersMap[entry.usernameKey]) return;
 
-            const ts = entry?.ingested_at ? Date.parse(entry.ingested_at) : NaN;
-            if (Number.isFinite(ts) && ts > maxTimestamp) {
-              maxTimestamp = ts;
-            }
-
-            const action = String(fields.action || '').toLowerCase();
-            if (action !== 'give') return;
-
-            const username = String(fields.username || '').trim();
-            if (!username) return;
-
-            const currency = String(fields.currency || '');
-            const amount = parseAmountFromCurrency(currency);
-            const isCredit = currency.toLowerCase().includes('credit');
-
-            const donationId = `${runId}_${entryId}`;
-            if (exclusionMap[donationId]) return;
-
-            const usernameKey = normalizeUsername(username);
-            if (hiddenUsersMap[usernameKey]) return;
-            if (isCredit) {
-              donatedCreditsMap[usernameKey] = (donatedCreditsMap[usernameKey] || 0) + amount;
-            } else {
-              donatedCashMap[usernameKey] = (donatedCashMap[usernameKey] || 0) + amount;
-            }
-          });
+          if (entry.isCredit) {
+            donatedCreditsMap[entry.usernameKey] = (donatedCreditsMap[entry.usernameKey] || 0) + entry.amount;
+          } else {
+            donatedCashMap[entry.usernameKey] = (donatedCashMap[entry.usernameKey] || 0) + entry.amount;
+          }
         });
 
-        setLastUpdatedUrl(toPtBrDateTime(maxTimestamp));
+        setLastUpdatedUrl(getLatestBankRunLabel(bankMeta, bankEntries));
 
         const mergedStats: ClanMemberStat[] = scraperData.map((scUser) => {
-          const usernameKey = normalizeUsername(scUser.username);
+          const usernameKey = normalizeBankUsername(scUser.username);
           return {
             username: scUser.username,
             rank: scUser.rank || 'Street Cleaner',
@@ -206,7 +163,7 @@ export function useAllClanStats() {
     }
 
     fetchStats();
-  }, [scraperData, scraperLoading, bankData, exclusionMap, hiddenUsersMap]);
+  }, [scraperData, scraperLoading, bankData, bankMeta, exclusionMap, hiddenUsersMap]);
 
   return { stats, loading, lastUpdated: lastUpdatedUrl };
 }

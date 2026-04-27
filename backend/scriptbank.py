@@ -27,11 +27,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(SCRIPT_DIR, "clan_bank_state.json")
 SUMMARY_FILE = os.path.join(SCRIPT_DIR, "clan_logs_summary.json")
 HEADLESS = True # Deixe como True pois a VPS não tem tela
-INTERVALO_HORAS = 1
-RETRY_INICIAL_SEGUNDOS = 60
-MAX_TENTATIVAS_COLETA = 3
-RETRY_FALHA_COLETA_SEGUNDOS = 30
-SELENIUM_COMMAND_TIMEOUT_SEGUNDOS = 300
+INTERVALO_HORAS = 6
 # --------------------
 
 
@@ -52,7 +48,28 @@ def load_last_seen_id():
             data = json.load(f_state)
             return str(data.get("last_seen_row_id", "")).strip() or None
     except Exception:
-        return None
+        firebase_last_seen = load_last_seen_id_from_firebase()
+        if firebase_last_seen:
+            print(f"Estado local ausente. Último ID recuperado do Firebase: {firebase_last_seen}")
+        return firebase_last_seen
+
+
+def load_last_seen_id_from_firebase():
+    try:
+        url = FIREBASE_BASE_URL.rstrip("/") + "/clan_logs_meta/latest_run.json"
+        resp = requests.get(url, timeout=20)
+        resp.raise_for_status()
+        data = resp.json()
+        bank_meta = (data or {}).get("tabs", {}).get(TAB_KEY, {})
+
+        for field_name in ("newest_row_id", "last_seen_before_run"):
+            value = str(bank_meta.get(field_name, "")).strip()
+            if value:
+                return value
+    except Exception as e:
+        print(f"Não foi possível recuperar último ID do Firebase: {e}")
+
+    return None
 
 
 def save_last_seen_id(last_seen_row_id, run_id):
@@ -86,14 +103,6 @@ def firebase_patch(path, payload):
     resp = requests.patch(url, json=payload, timeout=60)
     if not resp.ok:
         print("Firebase PATCH falhou:", resp.text[:500])
-    resp.raise_for_status()
-
-
-def firebase_delete(path):
-    url = f"{FIREBASE_BASE_URL.rstrip('/')}/{path}.json"
-    resp = requests.delete(url, timeout=60)
-    if not resp.ok:
-        print("Firebase DELETE falhou:", resp.text[:500])
     resp.raise_for_status()
 
 
@@ -267,7 +276,7 @@ def extrair_bank_e_enviar(driver, run_id, last_seen_row_id=None):
 
         if pagina < total_paginas:
             if not navegar_proxima_pagina(driver, pagina):
-                raise RuntimeError(f"[{TAB_LABEL}] Falha ao navegar para a pagina {pagina + 1}.")
+                break
 
     if lote_firebase:
         firebase_patch(f"clan_logs/runs/{run_id}/{TAB_KEY}", lote_firebase)
@@ -284,20 +293,28 @@ def extrair_bank_e_enviar(driver, run_id, last_seen_row_id=None):
     }
 
 
-def build_firefox_driver():
+def executar_scraper_bank():
+    print("Iniciando o Firefox (Gecko), otimizado para VPS...")
+    run_id = dt.datetime.now(dt.UTC).strftime("%Y%m%d_%H%M%S")
+    last_seen_row_id = load_last_seen_id() or "1715"
+    print(f"Último ID usado como corte da coleta: {last_seen_row_id}")
+
     options = webdriver.FirefoxOptions()
     options.binary_location = "/usr/lib/firefox/firefox"
     if HEADLESS:
         options.add_argument("--headless")
 
-    # --- OTIMIZACOES PARA VPS FRACA ---
+    # --- OTIMIZAÇÔES PARA VPS FRACA ---
+    # Desativa imagens do jogo (salva muita ram e CPU no painel do banco)
     options.set_preference("permissions.default.image", 2)
+    # Desabilita o cache de disco brutal do navegador pra não sobrecarregar HD da VPS
     options.set_preference("browser.cache.disk.enable", False)
     options.set_preference("browser.cache.memory.enable", False)
     options.set_preference("browser.cache.offline.enable", False)
     options.set_preference("network.http.use-cache", False)
 
-    profile_path = os.path.join(SCRIPT_DIR, "firefox_profile")
+    # Persistência de cookies do Mozilla (Profile Dir)
+    profile_path = os.path.join(os.getcwd(), "firefox_profile")
     if not os.path.exists(profile_path):
         os.makedirs(profile_path)
     options.add_argument("-profile")
@@ -305,55 +322,39 @@ def build_firefox_driver():
 
     service = FirefoxService("/usr/local/bin/geckodriver")
     driver = webdriver.Firefox(service=service, options=options)
+
     try:
-        driver.command_executor.set_timeout(SELENIUM_COMMAND_TIMEOUT_SEGUNDOS)
-    except Exception:
-        try:
-            driver.command_executor._client_config.timeout = SELENIUM_COMMAND_TIMEOUT_SEGUNDOS
-        except Exception:
-            pass
-    return driver
+        print("Acessando a página inicial...")
+        driver.get("https://fairview.deadfrontier.com/onlinezombiemmo/index.php")
+        time.sleep(2)
 
+        if "Logout" not in driver.page_source:
+            try:
+                user_field = driver.find_element(By.CSS_SELECTOR, "#frmLogin input[name='user']")
+                pass_field = driver.find_element(By.CSS_SELECTOR, "#frmLogin input[name='passwrd']")
+            except Exception:
+                driver.get("https://fairview.deadfrontier.com/onlinezombiemmo/ExternalLoginReg.php")
+                time.sleep(2)
+                user_field = driver.find_element(By.CSS_SELECTOR, "#frmLogin input[name='user']")
+                pass_field = driver.find_element(By.CSS_SELECTOR, "#frmLogin input[name='passwrd']")
 
-def executar_scraper_bank():
-    run_id = dt.datetime.now(dt.UTC).strftime("%Y%m%d_%H%M%S")
-    last_seen_row_id = load_last_seen_id()
-    print(f"Último ID salvo no estado local: {last_seen_row_id}")
+            print(f"Preenchendo credenciais para: {USUARIO}")
+            user_field.clear()
+            user_field.send_keys(USUARIO)
+            pass_field.clear()
+            pass_field.send_keys(SENHA)
+            pass_field.send_keys(Keys.RETURN)
+            print("Login submetido.")
 
-    for tentativa in range(1, MAX_TENTATIVAS_COLETA + 1):
-        driver = None
-        try:
-            print(f"\n[Tentativa {tentativa}/{MAX_TENTATIVAS_COLETA}] Iniciando Firefox (Gecko)...")
-            driver = build_firefox_driver()
+            time.sleep(3)
+            fechar_alerta_se_existir(driver)
 
-            print("Acessando a página inicial...")
-            driver.get("https://fairview.deadfrontier.com/onlinezombiemmo/index.php")
-            time.sleep(2)
+            # --- VERIFICAÇÃO DE 2FA (Enhanced Security) ---
+            if "enhanced security" in driver.page_source.lower() and "authentication code" in driver.page_source.lower():
+                print("\n[!] Tela de Enhanced Security (Email) detectada!")
+                codigo_2fa = input(">>> Digite o código de 6 dígitos recebido no seu e-mail: ").strip()
 
-            if "Logout" not in driver.page_source:
                 try:
-                    user_field = driver.find_element(By.CSS_SELECTOR, "#frmLogin input[name='user']")
-                    pass_field = driver.find_element(By.CSS_SELECTOR, "#frmLogin input[name='passwrd']")
-                except Exception:
-                    driver.get("https://fairview.deadfrontier.com/onlinezombiemmo/ExternalLoginReg.php")
-                    time.sleep(2)
-                    user_field = driver.find_element(By.CSS_SELECTOR, "#frmLogin input[name='user']")
-                    pass_field = driver.find_element(By.CSS_SELECTOR, "#frmLogin input[name='passwrd']")
-
-                print(f"Preenchendo credenciais para: {USUARIO}")
-                user_field.clear()
-                user_field.send_keys(USUARIO)
-                pass_field.clear()
-                pass_field.send_keys(SENHA)
-                pass_field.send_keys(Keys.RETURN)
-                print("Login submetido.")
-
-                time.sleep(3)
-                fechar_alerta_se_existir(driver)
-
-                if "enhanced security" in driver.page_source.lower() and "authentication code" in driver.page_source.lower():
-                    print("\n[!] Tela de Enhanced Security (Email) detectada!")
-                    codigo_2fa = input(">>> Digite o código de 6 dígitos recebido no seu e-mail: ").strip()
                     script_js = f"""
                     var inputs = document.querySelectorAll('input[type="text"], input[type="password"], input[type="number"]');
                     var targetInput = null;
@@ -375,90 +376,64 @@ def executar_scraper_bank():
                         print("Código injetado com JS! Aguardando o jogo...")
                         time.sleep(5)
                     else:
-                        raise RuntimeError("Campo de 2FA não localizado.")
-            else:
-                print("Já logado de primeira! (Cookies restaurados do firefox_profile)")
+                        print("Erro: campo 2FA não localizado pelo JS.")
+                except Exception as e:
+                    print(f"Erro ao tentar preencher o 2FA via JS: {e}")
+            # ----------------------------------------------
+        else:
+            print("Já logado de primeira! (Cookies restaurados do firefox_profile)")
 
-            print(f"Acessando o clã via link direto: {URL_STORAGE_LOG}")
-            driver.get(URL_STORAGE_LOG)
-            time.sleep(3)
-            fechar_alerta_se_existir(driver)
+        print(f"Acessando o clã via link direto: {URL_STORAGE_LOG}")
+        driver.get(URL_STORAGE_LOG)
+        time.sleep(3)
+        fechar_alerta_se_existir(driver)
 
-            print("Abrindo tabela Bank...")
-            abrir_popup_logs(driver)
+        print("Abrindo tabela Bank...")
+        abrir_popup_logs(driver)
 
-            resumo_bank = extrair_bank_e_enviar(driver, run_id, last_seen_row_id=last_seen_row_id)
+        resumo_bank = extrair_bank_e_enviar(driver, run_id, last_seen_row_id=last_seen_row_id)
 
-            novo_ultimo_id = resumo_bank.get("newest_row_id")
-            if novo_ultimo_id:
-                save_last_seen_id(novo_ultimo_id, run_id)
+        novo_ultimo_id = resumo_bank.get("newest_row_id")
+        if novo_ultimo_id:
+            save_last_seen_id(novo_ultimo_id, run_id)
 
-            resumo_geral = {
-                "run_id": run_id,
-                "source_url": URL_STORAGE_LOG,
-                "ingested_at": now_iso(),
-                "tabs": {
-                    TAB_KEY: resumo_bank,
-                },
-            }
+        resumo_geral = {
+            "run_id": run_id,
+            "source_url": URL_STORAGE_LOG,
+            "ingested_at": now_iso(),
+            "tabs": {
+                TAB_KEY: resumo_bank,
+            },
+        }
 
-            try:
-                firebase_put(f"clan_logs_meta/runs/{run_id}", resumo_geral)
-                firebase_put("clan_logs_meta/latest_run", resumo_geral)
-            except Exception as meta_err:
-                print(f"ALERTA: não foi possível gravar clan_logs_meta (coleta principal já salva): {meta_err}")
+        firebase_put(f"clan_logs_meta/runs/{run_id}", resumo_geral)
+        firebase_put("clan_logs_meta/latest_run", resumo_geral)
 
-            with open(SUMMARY_FILE, "w", encoding="utf-8") as f_summary:
-                json.dump(resumo_geral, f_summary, ensure_ascii=False, indent=2)
+        with open(SUMMARY_FILE, "w", encoding="utf-8") as f_summary:
+            json.dump(resumo_geral, f_summary, ensure_ascii=False, indent=2)
 
-            print("-> Extração Finalizada com Sucesso!")
-            return True
+        print("-> Extração Finalizada com Sucesso!")
 
-        except Exception as e:
-            print(f"Ocorreu um erro interno (tentativa {tentativa}/{MAX_TENTATIVAS_COLETA}): {e}")
-            traceback.print_exc()
-            if tentativa < MAX_TENTATIVAS_COLETA:
-                print(f"Reiniciando tentativa em {RETRY_FALHA_COLETA_SEGUNDOS}s...")
-                time.sleep(RETRY_FALHA_COLETA_SEGUNDOS)
-        finally:
-            if driver is not None:
-                try:
-                    driver.quit()
-                except Exception:
-                    pass
-
-    print("Todas as tentativas falharam. Removendo coleta parcial para não poluir os dados...")
-    try:
-        firebase_delete(f"clan_logs/runs/{run_id}")
-    except Exception as cleanup_err:
-        print(f"ALERTA: não foi possível limpar run parcial em clan_logs/runs/{run_id}: {cleanup_err}")
-    try:
-        firebase_delete(f"clan_logs_meta/runs/{run_id}")
-    except Exception:
-        pass
-    return False
+    except Exception as e:
+        print(f"Ocorreu um erro interno: {e}")
+        traceback.print_exc()
+    finally:
+        driver.quit()
 
 
 if __name__ == "__main__":
     intervalo_segundos = int(INTERVALO_HORAS * 3600)
-    print("Buscador do Bank online - modo incremental sem duplicar")
-    print("Coleta inicial imediata ao iniciar o processo (com retry até sucesso).")
-    print(f"Ciclo continuo - Repetição a cada: {INTERVALO_HORAS} hora(s).")
+    print("Buscador do Bank online - modo incremental")
+    print(f"Ciclo continuo - Repetição a cada: {INTERVALO_HORAS} horas.")
 
-    # Primeira coleta imediata ao subir o script (forçada até conseguir)
     while True:
-        inicio = now_iso()
-        print(f"\n[+] Iniciando coleta inicial as: {inicio}")
-        if executar_scraper_bank():
-            print("[+] Coleta inicial concluída com sucesso.")
-            break
-        print(f"[!] Coleta inicial falhou. Nova tentativa em {RETRY_INICIAL_SEGUNDOS}s...")
-        time.sleep(RETRY_INICIAL_SEGUNDOS)
-
-    # Depois segue no ciclo de 1 hora
-    while True:
-        print(f"Zzz.. Rotina em descanso.. Próxima em ~{INTERVALO_HORAS} hora(s).")
-        time.sleep(intervalo_segundos)
         inicio = now_iso()
         print(f"\n[+] Iniciando rotina as: {inicio}")
-        executar_scraper_bank()
+        try:
+            executar_scraper_bank()
+        except Exception:
+            traceback.print_exc()
+
+        proxima = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=intervalo_segundos)
+        print(f"Zzz.. Rotina em descanso.. Próxima em: {proxima.isoformat().replace('+00:00', 'Z')}")
+        time.sleep(intervalo_segundos)

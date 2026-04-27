@@ -11,9 +11,9 @@ export default function Estatisticas() {
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center p-6">
-        <div className="flex flex-col items-center gap-4 text-slate-400">
+        <div className="flex flex-col items-center gap-4 text-zinc-400">
           <Loader2 className="w-12 h-12 animate-spin text-red-500" />
-          <p className="font-serif tracking-widest uppercase">Loading clan data...</p>
+          <p className="font-semibold tracking-[0.12em] uppercase">Loading clan data...</p>
         </div>
       </div>
     );
@@ -27,28 +27,28 @@ export default function Estatisticas() {
   const lootStats = [...stats].sort((a, b) => b.totalLoot - a.totalLoot);
 
   return (
-    <div className="space-y-8 animate-in mt-14">
+    <div className="page-shell min-h-screen bg-black text-zinc-200 px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         <header className="mb-10 text-center md:text-left flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
-            <h1 className="text-4xl md:text-5xl font-black font-serif tracking-wider uppercase bg-gradient-to-r from-white to-slate-500 bg-clip-text text-transparent">
+            <h1 className="text-3xl md:text-5xl font-semibold uppercase text-white">
               Clan Statistics
             </h1>
-            <p className="text-slate-400 mt-2 tracking-wide">
+            <p className="text-zinc-400 mt-2">
               Consolidated view of contributions and loot.
             </p>
             {lastUpdated && (
-              <p className="text-slate-500 mt-1 font-mono text-sm opacity-80">
+              <p className="text-zinc-500 mt-1 font-mono text-sm opacity-80">
                 Última atualização do Banco: {lastUpdated}
               </p>
             )}
           </div>
 
-          <div className="flex bg-[#0a0a0a] p-1 border border-white/10 rounded-lg shrink-0">
+          <div className="flex bg-zinc-950/80 p-1 border border-white/10 rounded-sm shrink-0">
             <button
               onClick={() => setActiveTab('donations')}
               className={cn(
-                "flex items-center gap-2 px-6 py-2.5 rounded-md text-sm font-semibold tracking-wide transition-all uppercase font-serif",
-                activeTab === 'donations' ? "bg-red-600 text-white shadow-lg shadow-red-900/20" : "text-slate-400 hover:text-white"
+                "flex items-center gap-2 px-6 py-2.5 rounded-sm text-sm font-semibold tracking-[0.08em] transition-all uppercase",
+                activeTab === 'donations' ? "bg-white text-black" : "text-zinc-400 hover:text-white hover:bg-white/[0.05]"
               )}
             >
               <Coins className="w-4 h-4" /> Top Donators
@@ -56,8 +56,8 @@ export default function Estatisticas() {
             <button
               onClick={() => setActiveTab('loot')}
               className={cn(
-                "flex items-center gap-2 px-6 py-2.5 rounded-md text-sm font-semibold tracking-wide transition-all uppercase font-serif",
-                activeTab === 'loot' ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20" : "text-slate-400 hover:text-white"
+                "flex items-center gap-2 px-6 py-2.5 rounded-sm text-sm font-semibold tracking-[0.08em] transition-all uppercase",
+                activeTab === 'loot' ? "bg-white text-black" : "text-zinc-400 hover:text-white hover:bg-white/[0.05]"
               )}
             >
               <Trophy className="w-4 h-4" /> Total Loot
@@ -68,20 +68,20 @@ export default function Estatisticas() {
         <div className="w-full">
           
           {activeTab === 'donations' && (
-            <div className="bg-[#0a0a0a] border border-white/5 rounded-xl shadow-xl overflow-hidden p-6 relative animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-900" />
+            <div className="surface-panel rounded-sm overflow-hidden p-6 relative animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="absolute top-0 left-0 w-full h-px bg-white/15" />
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-red-950/30 rounded text-red-500">
+                <div className="p-2 bg-white/[0.04] rounded-sm text-zinc-300 border border-white/10">
                   <Coins className="w-6 h-6" />
                 </div>
-                <h2 className="text-xl font-serif uppercase tracking-widest text-slate-200">
+                <h2 className="text-xl font-semibold uppercase text-zinc-200">
                   Top Doadores do Clã
                 </h2>
               </div>
               
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm whitespace-nowrap">
-                  <thead className="uppercase tracking-widest text-xs bg-black text-slate-500 font-serif border-b border-white/5">
+                  <thead className="uppercase tracking-[0.12em] text-xs bg-black/70 text-zinc-500 font-sans border-b border-white/10">
                     <tr>
                       <th className="px-6 py-4 font-bold">Posição</th>
                       <th className="px-6 py-4 font-bold">Nome do Operador</th>
@@ -93,15 +93,15 @@ export default function Estatisticas() {
                   <tbody className="divide-y divide-white/5 font-mono">
                     {donationStats.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center text-slate-500 font-serif tracking-widest uppercase">
+                        <td colSpan={5} className="px-6 py-12 text-center text-zinc-500 font-sans tracking-[0.12em] uppercase">
                           Nenhuma doação encontrada no registro.
                         </td>
                       </tr>
                     ) : (
                       donationStats.map((stat, i) => (
                         <tr key={stat.username} className="hover:bg-white/[0.02] transition-colors group">
-                          <td className="px-6 py-4 text-slate-600">{(i + 1).toString().padStart(2, '0')}</td>
-                          <td className="px-6 py-4 font-bold text-slate-200 group-hover:text-red-400 transition-colors flex flex-col sm:flex-row gap-2 sm:items-center">
+                          <td className="px-6 py-4 text-zinc-600">{(i + 1).toString().padStart(2, '0')}</td>
+                          <td className="px-6 py-4 font-bold text-zinc-200 group-hover:text-white transition-colors flex flex-col sm:flex-row gap-2 sm:items-center">
                             {stat.username}
                             <div className="md:hidden">
                                 <RankBadge rank={stat.rank} />
@@ -126,20 +126,20 @@ export default function Estatisticas() {
           )}
 
           {activeTab === 'loot' && (
-            <div className="bg-[#0a0a0a] border border-white/5 rounded-xl shadow-xl overflow-hidden p-6 relative animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-indigo-900" />
+            <div className="surface-panel rounded-sm overflow-hidden p-6 relative animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="absolute top-0 left-0 w-full h-px bg-white/15" />
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-blue-950/30 rounded text-blue-400">
+                <div className="p-2 bg-white/[0.04] rounded-sm text-zinc-300 border border-white/10">
                   <Trophy className="w-6 h-6" />
                 </div>
-                <h2 className="text-xl font-serif uppercase tracking-widest text-slate-200">
+                <h2 className="text-xl font-semibold uppercase text-zinc-200">
                   Accumulated Loot (Base + Scraper)
                 </h2>
               </div>
               
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm whitespace-nowrap">
-                  <thead className="uppercase tracking-widest text-xs bg-black text-slate-500 font-serif border-b border-white/5">
+                  <thead className="uppercase tracking-[0.12em] text-xs bg-black/70 text-zinc-500 font-sans border-b border-white/10">
                     <tr>
                       <th className="px-6 py-4 font-bold">Posição</th>
                       <th className="px-6 py-4 font-bold">Nome do Operador</th>
@@ -153,7 +153,7 @@ export default function Estatisticas() {
                   <tbody className="divide-y divide-white/5 font-mono">
                     {lootStats.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center text-slate-500 font-serif tracking-widest uppercase">
+                        <td colSpan={7} className="px-6 py-12 text-center text-zinc-500 font-sans tracking-[0.12em] uppercase">
                           No consolidated loot records.
                         </td>
                       </tr>
@@ -161,14 +161,14 @@ export default function Estatisticas() {
                       lootStats.map((stat, i) => {
                         const dailyLootClass = stat.dailyLoot > 0 ? "text-sky-500" : stat.dailyLoot < 0 ? "text-red-500" : "text-stone-600";
                         const dailyLootText = (stat.dailyLoot >= 0 ? '+' : '') + stat.dailyLoot.toLocaleString('pt-BR');
-                        const weeklyLootClass = stat.weeklyLoot > 5000 ? "text-emerald-500" : stat.weeklyLoot > 1000 ? "text-blue-500" : "text-stone-400";
+                        const weeklyLootClass = stat.weeklyLoot > 5000 ? "text-emerald-500" : stat.weeklyLoot > 1000 ? "text-zinc-100" : "text-zinc-400";
                         const clanWeeklyClass = stat.clanWeeklyLoot > 5000 ? "text-emerald-500" : stat.clanWeeklyLoot > 0 ? "text-stone-300" : "text-stone-600";
                         return (
                         <tr key={stat.username} className="hover:bg-white/[0.02] transition-colors group">
-                          <td className="px-6 py-4 text-slate-600">{(i + 1).toString().padStart(2, '0')}</td>
-                          <td className="px-6 py-4 font-bold text-slate-200 group-hover:text-blue-400 transition-colors flex flex-col sm:flex-row gap-2 sm:items-center">
+                          <td className="px-6 py-4 text-zinc-600">{(i + 1).toString().padStart(2, '0')}</td>
+                          <td className="px-6 py-4 font-bold text-zinc-200 group-hover:text-white transition-colors flex flex-col sm:flex-row gap-2 sm:items-center">
                             {stat.username}
-                            {stat.baseLoot > 0 && <span className="text-[10px] uppercase font-sans font-bold bg-blue-950/40 border border-blue-900/40 text-blue-400 px-1.5 py-0.5 rounded" title="Has Base Loot Registered">Base</span>}
+                            {stat.baseLoot > 0 && <span className="text-[10px] uppercase font-sans font-bold bg-white/[0.04] border border-white/10 text-zinc-300 px-1.5 py-0.5 rounded-sm" title="Has Base Loot Registered">Base</span>}
                             <div className="md:hidden">
                                 <RankBadge rank={stat.rank} />
                               </div>
@@ -185,7 +185,7 @@ export default function Estatisticas() {
                           <td className={cn("px-6 py-4 text-right font-bold hidden md:table-cell", clanWeeklyClass)}>
                             {stat.clanWeeklyLoot?.toLocaleString('pt-BR')}
                           </td>
-                          <td className="px-6 py-4 text-right text-blue-400 font-bold">
+                          <td className="px-6 py-4 text-right text-white font-bold">
                             {stat.totalLoot.toLocaleString('pt-BR')}
                           </td>
                         </tr>

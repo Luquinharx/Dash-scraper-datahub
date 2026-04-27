@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes pulse-slow {
   0%, 100% { opacity: 0.1; }
   50% { opacity: 0.2; }
@@ -11,24 +22,66 @@
 }
 
 @layer base {
+  html {
+    @apply bg-black;
+    color-scheme: dark;
+  }
+
   body {
-    @apply bg-black text-slate-200 font-sans;
+    @apply bg-black text-zinc-200 font-sans;
+    background:
+      linear-gradient(180deg, rgba(24, 24, 27, 0.72), rgba(0, 0, 0, 0.98) 34rem),
+      #000;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(113, 113, 122, 0.5) rgba(9, 9, 11, 0.8);
+  }
+
+  *::selection {
+    @apply bg-red-600/30 text-white;
+  }
   
   h1, h2, h3, h4, h5, h6 {
-    @apply font-serif text-white tracking-wider;
+    @apply font-sans text-white;
+    letter-spacing: 0;
+  }
+
+  button, a, input {
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
   .font-serif {
-    font-family: 'Cinzel', serif;
+    font-family: Georgia, 'Times New Roman', serif;
   }
   
   .font-sans {
-    font-family: 'Inter', sans-serif;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
+
+.page-shell {
+  animation: page-in 420ms ease-out both;
+}
+
+.surface-panel {
+  @apply bg-zinc-950/78 border border-white/10 shadow-2xl shadow-black/30 backdrop-blur-xl;
+}
+
+.soft-card {
+  @apply bg-zinc-950/68 border border-white/10 shadow-lg shadow-black/20 backdrop-blur-md transition-colors duration-200;
+}
+
+.soft-card:hover {
+  @apply border-white/20 bg-zinc-900/72;
+}
+
+.accent-red {
+  @apply text-red-500;
+}
 
 .animate-pulse-slow {
   animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
@@ -37,4 +90,3 @@
 .animate-subtle-drift {
     animation: subtle-drift 10s ease-in-out infinite alternate;
 }
-

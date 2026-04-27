@@ -1,4 +1,11 @@
 import { useState, useEffect } from 'react';
+import {
+  FIREBASE_RT_URL,
+  isDonationExcluded,
+  normalizeBankRuns,
+  normalizeBankUsername,
+  type RawBankRun,
+} from '../lib/bankLogs';
 
 export interface FirestoreClanData {
   joinDate: Date | null;
@@ -7,57 +14,21 @@ export interface FirestoreClanData {
   donatedCredits: number;
 }
 
-const FIREBASE_RT_URL = "https://deadclanbb-1f05e-default-rtdb.firebaseio.com";
-const REFRESH_MS = 60 * 1000;
-
 type ProfileRecord = {
   username?: string;
   all_time_clan_loots?: number;
   last_clan_join?: string;
 };
 
-type ExclusionMap = Record<string, boolean>;
-type HiddenUsersMap = Record<string, boolean>;
-
-interface BankLogFields {
-  action?: string;
-  currency?: string;
-  username?: string;
-}
-
-interface BankLogEntry {
-  fields?: BankLogFields;
-}
-
-interface BankRun {
-  bank?: Record<string, BankLogEntry> | BankLogEntry[];
-}
-
-function normalizeUsername(value: string): string {
-  return (value || '').trim().toLowerCase();
-}
-
-function parseAmountFromCurrency(currency: string): number {
-  const digits = (currency || '').replace(/\D/g, '');
-  return Number(digits || 0);
-}
-
-function getBankEntries(run: BankRun): Array<[string, BankLogEntry]> {
-  const bank = run?.bank;
-  if (!bank) return [];
-  if (Array.isArray(bank)) {
-    return bank.map((entry, index) => [String(index), entry]);
-  }
-  return Object.entries(bank);
-}
+const REFRESH_MS = 60 * 1000;
 
 export function useFirestoreClanData(username: string | undefined) {
   const [data, setData] = useState<FirestoreClanData>({ joinDate: null, baseLoot: 0, donatedCash: 0, donatedCredits: 0 });
   const [loading, setLoading] = useState(true);
-  const [logsData, setLogsData] = useState<Record<string, BankRun> | null>(null);
+  const [logsData, setLogsData] = useState<Record<string, RawBankRun> | null>(null);
   const [profilesData, setProfilesData] = useState<Record<string, ProfileRecord> | null>(null);
-  const [exclusionMap, setExclusionMap] = useState<ExclusionMap>({});
-  const [hiddenUsersMap, setHiddenUsersMap] = useState<HiddenUsersMap>({});
+  const [exclusionMap, setExclusionMap] = useState<Record<string, boolean>>({});
+  const [hiddenUsersMap, setHiddenUsersMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -80,21 +51,21 @@ export function useFirestoreClanData(username: string | undefined) {
       ]);
       if (cancelled) return;
 
-      const normalizedHiddenUsers: HiddenUsersMap = {};
+      const normalizedHiddenUsers: Record<string, boolean> = {};
       Object.entries((hiddenUsers || {}) as Record<string, boolean>).forEach(([rawKey, enabled]) => {
         if (!enabled) return;
-        let decodedKey = rawKey;
+        let decoded = rawKey;
         try {
-          decodedKey = decodeURIComponent(rawKey);
+          decoded = decodeURIComponent(rawKey);
         } catch {
-          decodedKey = rawKey;
+          decoded = rawKey;
         }
-        normalizedHiddenUsers[normalizeUsername(decodedKey)] = true;
+        normalizedHiddenUsers[normalizeBankUsername(decoded)] = true;
       });
 
-      setLogsData((logs || {}) as Record<string, BankRun>);
+      setLogsData((logs || {}) as Record<string, RawBankRun>);
       setProfilesData(profiles && typeof profiles === 'object' ? profiles : null);
-      setExclusionMap((exclusions || {}) as ExclusionMap);
+      setExclusionMap((exclusions || {}) as Record<string, boolean>);
       setHiddenUsersMap(normalizedHiddenUsers);
     };
 
@@ -123,15 +94,14 @@ export function useFirestoreClanData(username: string | undefined) {
         } catch {
           // ignore
         }
-        const uLower = decodedUsername.toLowerCase().trim();
-        const selectedUsernameKey = normalizeUsername(decodedUsername);
-        
+        const usernameKey = normalizeBankUsername(decodedUsername);
+
         let joinDate: Date | null = null;
         let baseLoot = 0;
 
         if (profilesData) {
           const userProfile = Object.values(profilesData).find((profile) =>
-            profile?.username?.toLowerCase().trim() === uLower
+            normalizeBankUsername(profile?.username || '') === usernameKey
           );
 
           if (userProfile) {
@@ -147,31 +117,17 @@ export function useFirestoreClanData(username: string | undefined) {
 
         let donatedCash = 0;
         let donatedCredits = 0;
+        normalizeBankRuns(logsData).forEach((entry) => {
+          if (entry.action !== 'give') return;
+          if (entry.usernameKey !== usernameKey) return;
+          if (isDonationExcluded(entry, exclusionMap)) return;
+          if (hiddenUsersMap[entry.usernameKey]) return;
 
-        Object.entries(logsData).forEach(([runId, run]) => {
-          getBankEntries(run).forEach(([entryId, entry]) => {
-            const fields = entry?.fields;
-            if (!fields) return;
-
-            const action = String(fields.action || '').toLowerCase();
-            if (action !== 'give') return;
-
-            const entryUsername = String(fields.username || '').trim();
-            const entryUsernameKey = normalizeUsername(entryUsername);
-            if (!entryUsernameKey || entryUsernameKey !== uLower) return;
-
-            const donationId = `${runId}_${entryId}`;
-            if (exclusionMap[donationId]) return;
-            if (hiddenUsersMap[selectedUsernameKey]) return;
-
-            const currency = String(fields.currency || '');
-            const amount = parseAmountFromCurrency(currency);
-            if (currency.toLowerCase().includes('credit')) {
-              donatedCredits += amount;
-            } else {
-              donatedCash += amount;
-            }
-          });
+          if (entry.isCredit) {
+            donatedCredits += entry.amount;
+          } else {
+            donatedCash += entry.amount;
+          }
         });
 
         setData({ joinDate, baseLoot, donatedCash, donatedCredits });

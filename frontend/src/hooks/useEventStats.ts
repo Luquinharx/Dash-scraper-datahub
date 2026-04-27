@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react';
 import { onValue, ref } from 'firebase/database';
 import { rtdb } from '../lib/firebase';
 import { useClanData } from './useClanData';
+import {
+  getLatestBankRunLabel,
+  normalizeBankRuns,
+  normalizeBankUsername,
+  type BankLogsMeta,
+  type RawBankRun,
+} from '../lib/bankLogs';
 
 export interface EventMemberStat {
   username: string;
@@ -10,35 +17,19 @@ export interface EventMemberStat {
   donatedCredits: number;
 }
 
-function normalizeUsername(value: string): string {
-  return (value || '').trim().toLowerCase();
-}
-
-function formatTimestampPtBr(timestampMs: number): string {
-  if (!Number.isFinite(timestampMs) || timestampMs <= 0) return '';
-  return new Date(timestampMs).toLocaleString('pt-BR', {
-    timeZone: 'America/Sao_Paulo',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 export function useEventStats() {
   const [stats, setStats] = useState<EventMemberStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdatedUrl, setLastUpdatedUrl] = useState<string>('');
   const { data: scraperData, loading: scraperLoading } = useClanData();
-  const [bankData, setBankData] = useState<Record<string, any> | null>(null);
+  const [bankData, setBankData] = useState<Record<string, RawBankRun> | null>(null);
+  const [bankMeta, setBankMeta] = useState<BankLogsMeta | null>(null);
 
   useEffect(() => {
-    const runsRef = ref(rtdb, 'clan_logs/runs');
-    const unsubscribe = onValue(
-      runsRef,
+    const unsubscribeRuns = onValue(
+      ref(rtdb, 'clan_logs/runs'),
       (snapshot) => {
-        setBankData((snapshot.val() || {}) as Record<string, any>);
+        setBankData((snapshot.val() || {}) as Record<string, RawBankRun>);
       },
       (error) => {
         console.error('Error listening clan_logs/runs:', error);
@@ -46,7 +37,21 @@ export function useEventStats() {
       }
     );
 
-    return () => unsubscribe();
+    const unsubscribeMeta = onValue(
+      ref(rtdb, 'clan_logs_meta/latest_run'),
+      (snapshot) => {
+        setBankMeta(snapshot.val() as BankLogsMeta | null);
+      },
+      (error) => {
+        console.error('Error listening clan_logs_meta/latest_run:', error);
+        setBankMeta(null);
+      }
+    );
+
+    return () => {
+      unsubscribeRuns();
+      unsubscribeMeta();
+    };
   }, []);
 
   useEffect(() => {
@@ -56,27 +61,8 @@ export function useEventStats() {
       try {
         const donatedCashMap: Record<string, number> = {};
         const donatedCreditsMap: Record<string, number> = {};
-        const allLogs: any[] = [];
-        let maxIngestedTimestamp = 0;
-
-        if (bankData && typeof bankData === 'object') {
-          Object.values(bankData).forEach((run: any) => {
-            if (!run?.bank) return;
-            const entries = Array.isArray(run.bank) ? run.bank : Object.values(run.bank);
-            entries.forEach((v: any) => {
-              if (v?.fields) {
-                allLogs.push(v.fields);
-              }
-
-              const parsed = v?.ingested_at ? Date.parse(v.ingested_at) : NaN;
-              if (Number.isFinite(parsed) && parsed > maxIngestedTimestamp) {
-                maxIngestedTimestamp = parsed;
-              }
-            });
-          });
-        }
-
-        setLastUpdatedUrl(formatTimestampPtBr(maxIngestedTimestamp));
+        const bankEntries = normalizeBankRuns(bankData);
+        setLastUpdatedUrl(getLatestBankRunLabel(bankMeta, bankEntries));
 
         const isDateInEventRange = (timeStr: string) => {
           if (!timeStr) return false;
@@ -93,22 +79,18 @@ export function useEventStats() {
           return year === 2026 && month === 4 && day >= 9 && day <= 12;
         };
 
-        allLogs.forEach((fields) => {
-          if (fields.action !== 'give' || !fields.username || !isDateInEventRange(fields.time)) return;
-          const curr = String(fields.currency || '').toLowerCase();
-          const amount = Number(curr.replace(/[^0-9]/g, '')) || 0;
-          const usernameKey = normalizeUsername(String(fields.username));
-          if (!usernameKey) return;
+        bankEntries.forEach((entry) => {
+          if (entry.action !== 'give' || !entry.username || !isDateInEventRange(entry.time)) return;
 
-          if (curr.includes('credit')) {
-            donatedCreditsMap[usernameKey] = (donatedCreditsMap[usernameKey] || 0) + amount;
+          if (entry.isCredit) {
+            donatedCreditsMap[entry.usernameKey] = (donatedCreditsMap[entry.usernameKey] || 0) + entry.amount;
           } else {
-            donatedCashMap[usernameKey] = (donatedCashMap[usernameKey] || 0) + amount;
+            donatedCashMap[entry.usernameKey] = (donatedCashMap[entry.usernameKey] || 0) + entry.amount;
           }
         });
 
         const mergedStats: EventMemberStat[] = scraperData.map((scUser) => {
-          const usernameKey = normalizeUsername(scUser.username);
+          const usernameKey = normalizeBankUsername(scUser.username);
           return {
             username: scUser.username,
             rank: scUser.rank || 'Street Cleaner',
@@ -126,7 +108,7 @@ export function useEventStats() {
     }
 
     fetchStats();
-  }, [scraperData, scraperLoading, bankData]);
+  }, [scraperData, scraperLoading, bankData, bankMeta]);
 
   return { stats, loading, lastUpdated: lastUpdatedUrl };
 }

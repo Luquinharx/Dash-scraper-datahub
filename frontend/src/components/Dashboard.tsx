@@ -152,30 +152,30 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-stone-200 font-sans">
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-4 md:py-8 space-y-8 animate-in fade-in duration-700">
+    <div className="min-h-screen bg-black text-zinc-200 font-sans">
+      <div className="page-shell w-full px-4 sm:px-6 lg:px-8 py-4 md:py-8 space-y-7">
 
         {/* Header */}
         <header className="flex flex-col md:flex-row md:items-end justify-between border-b border-white/10 pb-6 gap-6">
           <div className="relative">
-             <div className="absolute -left-10 top-0 w-1 h-full bg-red-600 hidden md:block"></div>
-            <h1 className="text-4xl md:text-5xl font-serif font-black text-white tracking-widest uppercase shadow-red-500/20 drop-shadow-lg">
-                Dash <span className="text-red-700">Loot</span>
+             <div className="absolute -left-10 top-1 hidden h-12 w-px bg-red-500/70 md:block"></div>
+            <h1 className="text-3xl md:text-5xl font-semibold text-white uppercase">
+                Dash <span className="text-zinc-300">Loot</span>
             </h1>
-            <p className="text-stone-500 mt-2 flex items-center gap-2 font-serif uppercase tracking-wider text-xs">
+            <p className="text-zinc-500 mt-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.12em]">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-30"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
               </span>
-              Last Update: <span className="text-stone-300 font-bold">{formatCollectedAt(latestCollectedAt)}</span>
+              Last Update: <span className="text-zinc-300 font-semibold">{formatCollectedAt(latestCollectedAt)}</span>
             </p>
           </div>
 
            <div className="flex items-center gap-3">
               <span className={cn(
-                "inline-flex items-center gap-1.5 px-4 py-2 rounded-sm text-xs font-serif font-bold tracking-widest uppercase border",
+                "inline-flex items-center gap-1.5 px-4 py-2 rounded-sm text-xs font-semibold tracking-[0.12em] uppercase border",
                 allUpdated
-                  ? "bg-red-950/20 text-red-400 border-red-900/40"
+                  ? "bg-white/[0.04] text-zinc-300 border-white/10"
                   : "bg-amber-950/20 text-amber-500 border-amber-900/40"        
               )}>
                 {allUpdated
@@ -188,40 +188,40 @@ export default function Dashboard() {
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-stone-900/50 border border-white/5 rounded-sm p-6 shadow-lg backdrop-blur-sm group hover:border-red-900/30 transition-all">        
+          <div className="soft-card rounded-sm p-6 group">        
             <div className="flex items-center gap-5">
-              <div className="p-4 bg-black border border-white/10 rounded-sm text-stone-400 group-hover:text-red-500 transition-colors">
+              <div className="p-4 bg-black border border-white/10 rounded-sm text-zinc-400 group-hover:text-white transition-colors">
                 <Users className="w-8 h-8" />
               </div>
               <div>
-                <p className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">Tracked Members</p>
-                <p className="text-3xl font-serif font-black text-white mt-1">{data.length}</p>
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">Tracked Members</p>
+                <p className="text-3xl font-semibold text-white mt-1">{data.length}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-stone-900/50 border border-white/5 rounded-sm p-6 shadow-lg backdrop-blur-sm group hover:border-red-900/30 transition-all">        
+          <div className="soft-card rounded-sm p-6 group">        
              <div className="flex items-center gap-5">
-              <div className="p-4 bg-black border border-white/10 rounded-sm text-stone-400 group-hover:text-red-500 transition-colors">
+              <div className="p-4 bg-black border border-white/10 rounded-sm text-zinc-400 group-hover:text-red-500 transition-colors">
                 <TrendingUp className="w-8 h-8" />
               </div>
               <div>
-                <p className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">Total Daily Loot</p>
-                <p className="text-3xl font-serif font-black text-white mt-1 text-red-500 drop-shadow-[0_0_8px_rgba(220,38,38,0.5)]">
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">Total Daily Loot</p>
+                <p className="text-3xl font-semibold text-white mt-1">
                     +{totalDailyLoot.toLocaleString('pt-BR')}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-stone-900/50 border border-white/5 rounded-sm p-6 shadow-lg backdrop-blur-sm group hover:border-red-900/30 transition-all">        
+          <div className="soft-card rounded-sm p-6 group">        
              <div className="flex items-center gap-5">
-              <div className="p-4 bg-black border border-white/10 rounded-sm text-stone-400 group-hover:text-red-500 transition-colors">
+              <div className="p-4 bg-black border border-white/10 rounded-sm text-zinc-400 group-hover:text-red-500 transition-colors">
                 <Flame className="w-8 h-8" />
               </div>
               <div>
-                <p className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">Top Earner</p>
-                <p className="text-3xl font-serif font-black text-white mt-1 truncate max-w-[200px]" title={topEarner?.username}>
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">Top Earner</p>
+                <p className="text-3xl font-semibold text-white mt-1 truncate max-w-[200px]" title={topEarner?.username}>
                   {topEarner?.username || '-'}
                 </p>
               </div>
@@ -232,7 +232,7 @@ export default function Dashboard() {
         {/* Top 3 Weekly Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {topEarnerData.map((earner) => (
-            <div key={earner.username} className="bg-stone-950 border border-white/10 rounded-sm p-6 shadow-lg backdrop-blur-sm hover:border-red-900/30 transition-all">
+            <div key={earner.username} className="soft-card rounded-sm p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className={cn(
                   "flex items-center justify-center w-10 h-10 rounded-sm text-sm font-bold",
@@ -242,25 +242,25 @@ export default function Dashboard() {
                 )}>
                   {earner.rank === 1 ? '🥇' : earner.rank === 2 ? '🥈' : '🥉'}
                 </div>
-                <span className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">Position {earner.rank}</span>
+                <span className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">Position {earner.rank}</span>
               </div>
-              <p className="text-sm text-stone-400 truncate mb-2">{earner.username}</p>
-              <p className="text-2xl font-mono font-bold text-red-500">{earner.weekly.toLocaleString('pt-BR')}</p>
-              <p className="text-xs text-stone-600 mt-2">Weekly Loot</p>
+              <p className="text-sm text-zinc-400 truncate mb-2">{earner.username}</p>
+              <p className="text-2xl font-mono font-bold text-white">{earner.weekly.toLocaleString('pt-BR')}</p>
+              <p className="text-xs text-zinc-600 mt-2">Weekly Loot</p>
             </div>
           ))}
         </div>
 
         {/* Controls */}
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-black border-y border-white/10 py-4">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 border-y border-white/10 bg-black/40 py-4">
           <div className="relative w-full sm:w-96">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
             <input
               type="text"
               placeholder="SEARCH OPERATIVE..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-stone-950 border border-white/10 rounded-sm text-white placeholder:text-stone-600 focus:outline-none focus:ring-1 focus:ring-red-900 focus:border-red-900 transition-all font-mono text-sm uppercase tracking-wider"
+              className="w-full pl-10 pr-4 py-3 bg-zinc-950/80 border border-white/10 rounded-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-white/20 focus:border-white/20 transition-all font-mono text-sm uppercase tracking-wider"
             />
           </div>
 
@@ -268,10 +268,10 @@ export default function Dashboard() {
             <button
               onClick={() => setFilterMode('all')}
               className={cn(
-                "px-4 py-2 rounded-sm text-xs font-serif font-bold uppercase tracking-widest transition-all",
+                "px-4 py-2 rounded-sm text-xs font-semibold uppercase tracking-[0.12em] transition-all",
                 filterMode === 'all'
-                  ? "bg-red-600 text-white shadow-lg shadow-red-600/50"
-                  : "bg-stone-800 text-stone-400 hover:bg-stone-700"
+                  ? "bg-white text-black"
+                  : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white"
               )}
             >
               All
@@ -279,10 +279,10 @@ export default function Dashboard() {
             <button
               onClick={() => setFilterMode('active')}
               className={cn(
-                "px-4 py-2 rounded-sm text-xs font-serif font-bold uppercase tracking-widest transition-all",
+                "px-4 py-2 rounded-sm text-xs font-semibold uppercase tracking-[0.12em] transition-all",
                 filterMode === 'active'
                   ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/50"
-                  : "bg-stone-800 text-stone-400 hover:bg-stone-700"
+                  : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white"
               )}
             >
               Active
@@ -290,10 +290,10 @@ export default function Dashboard() {
             <button
               onClick={() => setFilterMode('inactive')}
               className={cn(
-                "px-4 py-2 rounded-sm text-xs font-serif font-bold uppercase tracking-widest transition-all",
+                "px-4 py-2 rounded-sm text-xs font-semibold uppercase tracking-[0.12em] transition-all",
                 filterMode === 'inactive'
-                  ? "bg-red-600/70 text-white shadow-lg shadow-red-600/50"
-                  : "bg-stone-800 text-stone-400 hover:bg-stone-700"
+                  ? "bg-zinc-200 text-black"
+                  : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white"
               )}
             >
               Inactive
@@ -302,10 +302,10 @@ export default function Dashboard() {
         </div>
 
         {/* Table */}
-        <div className="bg-stone-950 border border-white/10 rounded-sm shadow-2xl overflow-hidden backdrop-blur-sm">
+        <div className="surface-panel rounded-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="text-xs text-stone-500 uppercase bg-black border-b border-white/10 font-serif tracking-widest">
+              <thead className="text-xs text-zinc-500 uppercase bg-black/70 border-b border-white/10 font-sans tracking-[0.12em]">
                 <tr>
                   <th className="px-6 py-5 font-bold cursor-pointer hover:text-white transition-colors select-none group focus:outline-none" onClick={() => handleSort('username')}>Username <SortIcon columnKey="username" /></th>
                   <th className="px-6 py-5 font-bold text-center hidden md:table-cell cursor-pointer hover:text-white transition-colors select-none group focus:outline-none" onClick={() => handleSort('rank')}>Rank <SortIcon columnKey="rank" /></th>
@@ -347,9 +347,9 @@ export default function Dashboard() {
 
                   // Cores para as TRs
                   const rowColor = (isClanEventHighlight && isPowerRaw)
-                    ? 'bg-gradient-to-r from-red-950/20 to-yellow-950/20 hover:from-red-950/30 hover:to-yellow-950/30'
+                    ? 'bg-gradient-to-r from-zinc-900/40 to-yellow-950/10 hover:from-zinc-900/70 hover:to-yellow-950/20'
                     : isClanEventHighlight
-                    ? 'bg-red-900/20 hover:bg-red-900/30'
+                    ? 'bg-white/[0.035] hover:bg-white/[0.06]'
                     : isPowerRaw
                     ? 'bg-yellow-900/20 hover:bg-yellow-900/30'
                     : '';
@@ -360,7 +360,7 @@ export default function Dashboard() {
                         rowColor
                       )}>
                       <td className="px-6 py-4 font-bold text-white whitespace-nowrap flex items-center gap-3">
-                        <span className="text-stone-600 w-6 text-xs text-right font-serif">{absoluteIdx + 1}.</span>
+                        <span className="text-zinc-600 w-6 text-xs text-right font-mono">{absoluteIdx + 1}.</span>
                         
                         {/* Emojis ficam aqui antes do nome, com title */}
                         {isClanEventHighlight && (
@@ -373,32 +373,32 @@ export default function Dashboard() {
                           >⚡</span>
                         )}
 
-                        <Link to={`/dashboard?user=${encodeURIComponent(username)}`} className="tracking-wide hover:text-red-500 hover:underline transition-all">
+                        <Link to={`/dashboard?user=${encodeURIComponent(username)}`} className="tracking-wide hover:text-white hover:underline transition-all">
                             {username}
                         </Link>
                       </td>
-                      <td className="px-6 py-4 text-center text-stone-300 hidden md:table-cell">
+                      <td className="px-6 py-4 text-center text-zinc-300 hidden md:table-cell">
                         <RankBadge rank={rank} />
                       </td>
                       <td className={cn(
                         "px-6 py-4 text-right font-bold w-28",
-                        dailyLoot > 0 ? "text-emerald-500" : dailyLoot < 0 ? "text-red-500" : "text-stone-600"
+                        dailyLoot > 0 ? "text-emerald-500" : dailyLoot < 0 ? "text-red-500" : "text-zinc-600"
                       )}>
                         {dlText}
                       </td>
-                      <td className="px-6 py-4 text-right text-stone-400 w-32 hidden sm:table-cell">
+                      <td className="px-6 py-4 text-right text-zinc-400 w-32 hidden sm:table-cell">
                         {weeklyLoot.toLocaleString('pt-BR')}
                       </td>
-                      <td className="px-6 py-4 text-right text-stone-300 font-bold w-32 border-l border-white/5 bg-stone-900/10">
+                      <td className="px-6 py-4 text-right text-zinc-300 font-bold w-32 border-l border-white/5 bg-white/[0.025]">
                         {clanWeeklyLoot.toLocaleString('pt-BR')}
                       </td>
-                      <td className="px-6 py-4 text-right text-stone-300 font-bold">
+                      <td className="px-6 py-4 text-right text-zinc-300 font-bold">
                         {allTimeLoot.toLocaleString('pt-BR')}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <span className={cn(
                           "inline-flex items-center justify-center px-2 py-0.5 rounded-sm text-xs font-bold min-w-[2.5rem] tracking-wider border",
-                          streak > 0 ? "bg-emerald-950/30 text-emerald-500 border-emerald-900/30" : streak < 0 ? "bg-red-950/30 text-red-500 border-red-900/30" : "bg-stone-900 text-stone-600 border-stone-800"
+                          streak > 0 ? "bg-emerald-950/30 text-emerald-500 border-emerald-900/30" : streak < 0 ? "bg-red-950/30 text-red-500 border-red-900/30" : "bg-zinc-900 text-zinc-600 border-zinc-800"
                         )}>
                           {stText}
                         </span>
@@ -408,7 +408,7 @@ export default function Dashboard() {
                 })}
                 {paginatedData.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-stone-600 font-serif uppercase tracking-widest">
+                    <td colSpan={7} className="px-6 py-12 text-center text-zinc-600 font-sans uppercase tracking-[0.12em]">
                       Não há contas para exibir.
                     </td>
                   </tr>
@@ -418,22 +418,22 @@ export default function Dashboard() {
           </div>
 
           {totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row justify-between items-center bg-black border-t border-white/10 px-6 py-4 gap-4">
-              <span className="text-xs font-serif uppercase tracking-widest text-stone-500">
+            <div className="flex flex-col sm:flex-row justify-between items-center bg-black/70 border-t border-white/10 px-6 py-4 gap-4">
+              <span className="text-xs font-sans uppercase tracking-[0.12em] text-zinc-500">
                 PÃ¡gina {currentPage} de {totalPages}
               </span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}       
                   disabled={currentPage === 1}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-stone-900 border border-white/10 rounded-sm text-xs font-serif font-bold uppercase tracking-widest text-stone-400 hover:text-white hover:border-red-900 hover:bg-stone-950 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-zinc-900 border border-white/10 rounded-sm text-xs font-semibold uppercase tracking-[0.12em] text-zinc-400 hover:text-white hover:border-white/20 hover:bg-zinc-950 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronLeft className="w-4 h-4" /> Previous
                 </button>
                 <button
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-stone-900 border border-white/10 rounded-sm text-xs font-serif font-bold uppercase tracking-widest text-stone-400 hover:text-white hover:border-red-900 hover:bg-stone-950 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-zinc-900 border border-white/10 rounded-sm text-xs font-semibold uppercase tracking-[0.12em] text-zinc-400 hover:text-white hover:border-white/20 hover:bg-zinc-950 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Next <ChevronRight className="w-4 h-4" />
                 </button>

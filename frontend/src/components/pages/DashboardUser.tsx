@@ -8,6 +8,7 @@ import { useProfilesData } from '../../hooks/useProfilesData';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { Search } from 'lucide-react';
 import { Tooltip as RechartsTooltip } from 'recharts';
+import { formatCompactPtBR, formatSignedCompactPtBR } from '../../lib/format';
 
 
 
@@ -96,6 +97,17 @@ ${~~(donatedCash / 1000000)}M doados = ${collateralDonationsVal.toLocaleString('
 ${~~(totalLoot / 1000)}K loot = ${collateralLootVal.toLocaleString('pt-BR')}
 -------------------
 Total = ${collateralTotal.toLocaleString('pt-BR')}`;
+  const chartTooltipStyle = {
+    backgroundColor: '#09090b',
+    border: '1px solid rgba(255,255,255,0.12)',
+    borderRadius: '2px',
+    color: '#e4e4e7',
+    fontFamily: 'monospace',
+  };
+  const compactTooltipFormatter = (value: unknown) => [
+    formatCompactPtBR(Number(value || 0)),
+    'Total',
+  ];
   const isLoading = loadingNames;
 
   if (isLoading) {
@@ -109,19 +121,19 @@ Total = ${collateralTotal.toLocaleString('pt-BR')}`;
   }
 
   return (
-    <div className="min-h-screen bg-black text-stone-200">
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="min-h-screen bg-black text-zinc-200">
+      <div className="page-shell w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 mx-auto space-y-7">
 
         {/* Header */}
         <header className="flex flex-col md:flex-row md:items-end justify-between border-b border-white/10 pb-6 gap-6">
           <div className="relative">
-            <div className="absolute -left-10 top-0 w-1 h-full bg-red-600 hidden md:block"></div>
-            <h1 className="text-4xl md:text-5xl font-serif font-black text-white tracking-widest uppercase shadow-red-500/20 drop-shadow-lg flex items-center gap-4">
-                Member <span className="text-red-700">Dash</span>
+            <div className="absolute -left-10 top-1 hidden h-12 w-px bg-red-500/70 md:block"></div>
+            <h1 className="text-3xl md:text-5xl font-semibold text-white uppercase flex items-center gap-3">
+                Member <span className="text-zinc-300">Dash</span>
             </h1>
-            <p className="text-stone-500 mt-2 flex items-center gap-2 font-serif uppercase tracking-wider text-xs">
+            <p className="text-zinc-500 mt-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.12em]">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-30"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
               </span>
               Live Performance Data | Last Update: {formatCollectedAt(stats?.collected_at || memberTSData?.collected_at)}
@@ -129,12 +141,12 @@ Total = ${collateralTotal.toLocaleString('pt-BR')}`;
           </div>
 
           <div>
-            <label className="block text-xs font-serif font-bold text-stone-500 mb-1 uppercase tracking-widest">Select Member</label>
+            <label className="block text-xs font-semibold text-zinc-500 mb-1 uppercase tracking-[0.12em]">Select Member</label>
             <div className="relative group">
                 <select
                 value={selectedNickJogo}
                 onChange={e => handleSelect(e.target.value)}
-                className="px-4 py-3 bg-black border border-white/10 rounded-sm text-white focus:outline-none focus:ring-1 focus:ring-red-900 focus:border-red-900 transition-all min-w-[250px] font-mono text-sm uppercase appearance-none cursor-pointer hover:border-white/30"
+                className="px-4 py-3 bg-zinc-950/80 border border-white/10 rounded-sm text-white focus:outline-none focus:ring-1 focus:ring-white/20 focus:border-white/20 transition-all min-w-[250px] font-mono text-sm uppercase appearance-none cursor-pointer hover:border-white/30"
                 style={{ colorScheme: 'dark' }}
                 >
                 {usernames.map(u => {
@@ -143,11 +155,11 @@ Total = ${collateralTotal.toLocaleString('pt-BR')}`;
                     displayName = decodeURIComponent(u);
                   } catch (e) {}
                   return (
-                    <option key={u} value={u} className="bg-stone-950 text-white hover:bg-red-900/20">{displayName}</option>
+                    <option key={u} value={u} className="bg-zinc-950 text-white">{displayName}</option>
                   );
                 })}
                 </select>
-                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500 pointer-events-none group-hover:text-white transition-colors" />
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none group-hover:text-white transition-colors" />
             </div>
           </div>
         </header>
@@ -160,80 +172,76 @@ Total = ${collateralTotal.toLocaleString('pt-BR')}`;
         ) : stats ? (
           <>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-stone-900/50 border border-white/5 rounded-sm p-6 shadow-sm flex items-center gap-4 hover:border-red-900/30 transition-colors">
+              <div className="soft-card rounded-sm p-6 flex items-center gap-4">
 
                   <div>
-                    <p className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">Member</p>
-                    <p className="text-xl font-bold text-white font-serif truncate max-w-[150px]" title={stats.username}>{stats.username}</p>
-                    <p className="text-[10px] text-stone-500 mt-1 uppercase">Join: {formattedJoinDate}</p>
+                    <p className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">Member</p>
+                    <p className="text-xl font-semibold text-white truncate max-w-[150px]" title={stats.username}>{stats.username}</p>
+                    <p className="text-[10px] text-zinc-500 mt-1 uppercase">Join: {formattedJoinDate}</p>
                     {memberTSData && <p className="text-[10px] text-purple-400 mt-1 uppercase font-bold">{memberTSData.rank}</p>}
                   </div>
               </div>
 
-              <div className="bg-stone-900/50 border border-white/5 rounded-sm p-6 shadow-sm flex items-center gap-4 hover:border-red-900/30 transition-colors">
+              <div className="soft-card rounded-sm p-6 flex items-center gap-4">
 
                   <div>
-                    <p className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">Donated</p>
-                      <p className="text-xl font-bold text-white font-serif tracking-widest">
+                    <p className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">Donated</p>
+                      <p className="text-xl font-semibold text-white">
                         ${donatedCash.toLocaleString('pt-BR')}
                         {donatedCredits > 0 && <span className="text-sm font-bold text-purple-400 ml-2">({donatedCredits.toLocaleString('pt-BR')} CR)</span>}
                       </p>
                   </div>
               </div>
 
-              <div className="bg-stone-900/50 border border-white/5 rounded-sm p-6 shadow-sm flex items-center gap-4 hover:border-red-900/30 transition-colors" title={tooltipText}>
+              <div className="soft-card rounded-sm p-6 flex items-center gap-4" title={tooltipText}>
                   <div>
-                    <p className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">Collateral</p>
-                    <p className="text-xl font-bold text-white font-serif">{collateralTotal.toLocaleString('pt-BR')}</p>
+                    <p className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">Collateral</p>
+                    <p className="text-xl font-semibold text-white">{collateralTotal.toLocaleString('pt-BR')}</p>
                   </div>
               </div>
 
-              <div className="bg-stone-900/50 border border-white/5 rounded-sm p-6 shadow-sm flex items-center gap-4 hover:border-red-900/30 transition-colors">
+              <div className="soft-card rounded-sm p-6 flex items-center gap-4">
 
                   <div>
-                    <p className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">Spins</p>
-                    <p className="text-xl font-bold text-white font-serif">{girosDisponiveis}</p>
+                    <p className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">Spins</p>
+                    <p className="text-xl font-semibold text-white">{girosDisponiveis}</p>
                   </div>
                 </div>
             </div>
 
             {/* Métricas de Loot */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-gradient-to-br from-stone-900 to-black border border-white/5 rounded-sm p-6 shadow-lg hover:border-red-900/30 transition-colors relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-16 h-16 bg-red-900/10 blur-[30px] rounded-full"></div>
+              <div className="soft-card rounded-sm p-6 relative overflow-hidden">
                 <div className="flex flex-col gap-2">
-                  <h3 className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">DAILY LOOT</h3>
-                  <p className="text-3xl font-black text-red-500 drop-shadow-[0_0_10px_rgba(220,38,38,0.3)]">
+                  <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">DAILY LOOT</h3>
+                  <p className="text-3xl font-semibold text-emerald-500">
                     +{stats.dailyLoot.toLocaleString('pt-BR')}
                   </p>
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-stone-900 to-black border border-white/5 rounded-sm p-6 shadow-lg hover:border-white/20 transition-colors relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-16 h-16 bg-stone-500/10 blur-[30px] rounded-full"></div>
+              <div className="soft-card rounded-sm p-6 relative overflow-hidden">
                 <div className="flex flex-col gap-2">
-                  <h3 className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">WEEK LOOT</h3>
-                  <p className="text-3xl font-bold text-white font-serif">
+                  <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">WEEK LOOT</h3>
+                  <p className="text-3xl font-semibold text-white">
                     {(memberTSData?.weekly_loots || 0).toLocaleString('pt-BR')}
                   </p>
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-stone-900 to-black border border-white/5 rounded-sm p-6 shadow-lg hover:border-red-900/30 transition-colors relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-16 h-16 bg-red-900/10 blur-[30px] rounded-full"></div>
+              <div className="soft-card rounded-sm p-6 relative overflow-hidden">
                 <div className="flex flex-col gap-2">
-                  <h3 className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">GANG LOOT</h3>
-                  <p className="text-3xl font-bold text-white font-serif">
+                  <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">GANG LOOT</h3>
+                  <p className="text-3xl font-semibold text-white">
                     {(memberTSData?.all_time_clan_loots || 0).toLocaleString('pt-BR')}
                   </p>
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-stone-900 to-black border border-white/5 rounded-sm p-6 shadow-lg hover:border-white/20 transition-colors relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-16 h-16 bg-stone-500/10 blur-[30px] rounded-full"></div>
+              <div className="soft-card rounded-sm p-6 relative overflow-hidden">
                 <div className="flex flex-col gap-2">
-                  <h3 className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">ALL TIME LOOTS</h3>
-                  <p className="text-3xl font-bold text-stone-300 font-serif">
+                  <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">ALL TIME LOOTS</h3>
+                  <p className="text-3xl font-semibold text-zinc-300">
                     {stats.currentAll.toLocaleString('pt-BR')}
                   </p>
                 </div>
@@ -243,8 +251,8 @@ Total = ${collateralTotal.toLocaleString('pt-BR')}`;
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Loot Diário - Area Chart */}
-              <div className="bg-stone-950 border border-white/5 rounded-sm p-6 shadow-xl">
-                <h2 className="text-lg font-serif font-bold text-stone-300 mb-6 uppercase tracking-wider">Activity Log (Daily)</h2>
+              <div className="surface-panel rounded-sm p-6">
+                <h2 className="text-lg font-semibold text-zinc-300 mb-6 uppercase">Activity Log (Daily)</h2>
                 {stats.dailyHistory.length > 0 ? (
                   <ResponsiveContainer width="100%" height={300}>
                     <AreaChart data={stats.dailyHistory}>
@@ -256,11 +264,12 @@ Total = ${collateralTotal.toLocaleString('pt-BR')}`;
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1c1917" />
                       <XAxis dataKey="data" stroke="#44403c" tick={{ fontSize: 10, fontFamily: 'monospace' }} />
-                      <YAxis stroke="#44403c" tick={{ fontSize: 10, fontFamily: 'monospace' }} />
+                      <YAxis stroke="#52525b" tick={{ fontSize: 10, fontFamily: 'monospace' }} tickFormatter={(value) => formatCompactPtBR(Number(value))} />
                       <RechartsTooltip
-                        contentStyle={{ backgroundColor: '#0c0a09', border: '1px solid #292524', borderRadius: '0px', color: '#e7e5e4', fontFamily: 'monospace' }}
+                        contentStyle={chartTooltipStyle}
+                        formatter={compactTooltipFormatter}
                         itemStyle={{ color: '#ef4444' }}
-                        labelStyle={{ color: '#78716c' }}
+                        labelStyle={{ color: '#a1a1aa' }}
                       />
                       <Area type="monotone" dataKey="valor" stroke="#dc2626" fillOpacity={1} fill="url(#colorValor)" strokeWidth={2} />
                     </AreaChart>
@@ -271,19 +280,20 @@ Total = ${collateralTotal.toLocaleString('pt-BR')}`;
               </div>
 
               {/* Loot Semanal - Bar Chart */}
-              <div className="bg-stone-950 border border-white/5 rounded-sm p-6 shadow-xl">
-                <h2 className="text-lg font-serif font-bold text-stone-300 mb-6 uppercase tracking-wider">Weekly Performance</h2>
+              <div className="surface-panel rounded-sm p-6">
+                <h2 className="text-lg font-semibold text-zinc-300 mb-6 uppercase">Weekly Performance</h2>
                 {stats.weeklyHistory.length > 0 ? (
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={stats.weeklyHistory}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1c1917" />
                       <XAxis dataKey="semana" stroke="#44403c" tick={{ fontSize: 10, fontFamily: 'monospace' }} />
-                      <YAxis stroke="#44403c" tick={{ fontSize: 10, fontFamily: 'monospace' }} />
+                      <YAxis stroke="#52525b" tick={{ fontSize: 10, fontFamily: 'monospace' }} tickFormatter={(value) => formatCompactPtBR(Number(value))} />
                       <RechartsTooltip
                         cursor={{fill: '#1c1917'}}
-                        contentStyle={{ backgroundColor: '#0c0a09', border: '1px solid #292524', borderRadius: '0px', color: '#e7e5e4', fontFamily: 'monospace' }}
+                        contentStyle={chartTooltipStyle}
+                        formatter={compactTooltipFormatter}
                         itemStyle={{ color: '#ef4444' }}
-                        labelStyle={{ color: '#78716c' }}
+                        labelStyle={{ color: '#a1a1aa' }}
                       />
                       <Bar dataKey="total" fill="#7f1d1d" radius={[2, 2, 0, 0]} activeBar={{ fill: '#dc2626' }} />
                     </BarChart>
@@ -298,46 +308,49 @@ Total = ${collateralTotal.toLocaleString('pt-BR')}`;
             {memberTSData && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* TS Diário - Area Chart */}
-                <div className="bg-stone-950 border border-white/5 rounded-sm p-6 shadow-xl">
-                  <h2 className="text-lg font-serif font-bold text-stone-300 mb-6 uppercase tracking-wider">TS Daily Activity</h2>
-                  <div className="flex items-center justify-center h-[300px] bg-black rounded">
+                <div className="surface-panel rounded-sm p-6">
+                  <h2 className="text-lg font-semibold text-zinc-300 mb-6 uppercase">TS Daily Activity</h2>
+                  <div className="flex items-center justify-center h-[300px] bg-black rounded-sm">
                     <ResponsiveContainer width="100%" height={300}>
                     <AreaChart data={stats.dailyTSHistory || []}>
                         <defs>
                           <linearGradient id="colorTSDaily" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.22}/>
+                            <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#1c1917" />
-                        <XAxis dataKey="data" stroke="#44403c" tick={{ fontSize: 10, fontFamily: 'monospace' }} />
-                        <YAxis stroke="#44403c" tick={{ fontSize: 10, fontFamily: 'monospace' }} />
+                        <XAxis dataKey="data" stroke="#52525b" tick={{ fontSize: 10, fontFamily: 'monospace' }} />
+                        <YAxis stroke="#52525b" tick={{ fontSize: 10, fontFamily: 'monospace' }} tickFormatter={(value) => formatCompactPtBR(Number(value))} />
                         <RechartsTooltip
-                          contentStyle={{ backgroundColor: '#0c0a09', border: '1px solid #292524', borderRadius: '0px', color: '#e7e5e4', fontFamily: 'monospace' }}
-                          itemStyle={{ color: '#a855f7' }}
-                          labelStyle={{ color: '#78716c' }}
+                          contentStyle={chartTooltipStyle}
+                          formatter={compactTooltipFormatter}
+                          itemStyle={{ color: '#e4e4e7' }}
+                          labelStyle={{ color: '#a1a1aa' }}
                         />
-                        <Area type="monotone" dataKey="valor" stroke="#a855f7" fillOpacity={1} fill="url(#colorTSDaily)" strokeWidth={2} />
+                        <Area type="monotone" dataKey="valor" stroke="#ef4444" fillOpacity={1} fill="url(#colorTSDaily)" strokeWidth={2} />
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
 
                 {/* TS Semanal - Bar Chart */}
-                <div className="bg-stone-950 border border-white/5 rounded-sm p-6 shadow-xl">
-                  <h2 className="text-lg font-serif font-bold text-stone-300 mb-6 uppercase tracking-wider">TS Weekly Summary</h2>
-                  <div className="flex items-center justify-center h-[300px] bg-black rounded">
+                <div className="surface-panel rounded-sm p-6">
+                  <h2 className="text-lg font-semibold text-zinc-300 mb-6 uppercase">TS Weekly Summary</h2>
+                  <div className="flex items-center justify-center h-[300px] bg-black rounded-sm">
                     <ResponsiveContainer width="100%" height={300}>
                       <BarChart data={stats.weeklyTSHistory && stats.weeklyTSHistory.length > 0 ? stats.weeklyTSHistory : [{ semana: "Atual", total: memberTSData.weekly_ts }]}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#1c1917" />
-                        <XAxis dataKey="semana" stroke="#44403c" tick={{ fontSize: 10, fontFamily: 'monospace' }} />
-                        <YAxis stroke="#44403c" tick={{ fontSize: 10, fontFamily: 'monospace' }} />
+                        <XAxis dataKey="semana" stroke="#52525b" tick={{ fontSize: 10, fontFamily: 'monospace' }} />
+                        <YAxis stroke="#52525b" tick={{ fontSize: 10, fontFamily: 'monospace' }} tickFormatter={(value) => formatCompactPtBR(Number(value))} />
                         <RechartsTooltip
-                          contentStyle={{ backgroundColor: '#0c0a09', border: '1px solid #292524', borderRadius: '0px', color: '#e7e5e4', fontFamily: 'monospace' }}
-                          itemStyle={{ color: '#a855f7' }}
-                          labelStyle={{ color: '#78716c' }}
+                          cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                          contentStyle={chartTooltipStyle}
+                          formatter={compactTooltipFormatter}
+                          itemStyle={{ color: '#e4e4e7' }}
+                          labelStyle={{ color: '#a1a1aa' }}
                         />
-                        <Bar dataKey="total" fill="#a855f7" />
+                        <Bar dataKey="total" fill="#ef4444" radius={[2, 2, 0, 0]} activeBar={{ fill: '#f4f4f5' }} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -348,52 +361,47 @@ Total = ${collateralTotal.toLocaleString('pt-BR')}`;
             {/* Métricas de TS */}
             {memberTSData && (
               <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-                <div className="bg-gradient-to-br from-stone-900 to-black border border-white/5 rounded-sm p-6 shadow-lg hover:border-purple-900/30 transition-colors relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-purple-900/10 blur-[30px] rounded-full"></div>
+                <div className="soft-card rounded-sm p-6 relative overflow-hidden">
                   <div className="flex flex-col gap-2">
-                    <h3 className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">DAILY TS</h3>
-                    <p className="text-3xl font-black text-purple-500 drop-shadow-[0_0_10px_rgba(168,85,247,0.3)]">
-                      +{stats.daily_ts_calc ? stats.daily_ts_calc.toLocaleString('pt-BR') : 0}
+                    <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">DAILY TS</h3>
+                    <p className="text-3xl font-semibold text-red-500" title={(stats.daily_ts_calc || 0).toLocaleString('pt-BR')}>
+                      {formatSignedCompactPtBR(stats.daily_ts_calc || 0)}
                     </p>
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-stone-900 to-black border border-white/5 rounded-sm p-6 shadow-lg hover:border-white/20 transition-colors relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-stone-500/10 blur-[30px] rounded-full"></div>
+                <div className="soft-card rounded-sm p-6 relative overflow-hidden">
                   <div className="flex flex-col gap-2">
-                    <h3 className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">WEEKLY TS</h3>
-                    <p className="text-3xl font-bold text-white font-serif">
-                      {memberTSData.weekly_ts.toLocaleString('pt-BR')}
+                    <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">WEEKLY TS</h3>
+                    <p className="text-3xl font-semibold text-white" title={memberTSData.weekly_ts.toLocaleString('pt-BR')}>
+                      {formatCompactPtBR(memberTSData.weekly_ts)}
                     </p>
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-stone-900 to-black border border-white/5 rounded-sm p-6 shadow-lg hover:border-purple-900/30 transition-colors relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-purple-900/10 blur-[30px] rounded-full"></div>
+                <div className="soft-card rounded-sm p-6 relative overflow-hidden">
                   <div className="flex flex-col gap-2">
-                    <h3 className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">GANG WEEKLY TS</h3>
-                    <p className="text-3xl font-bold text-white font-serif">
-                      {memberTSData.clan_weekly_ts.toLocaleString('pt-BR')}
+                    <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">GANG WEEKLY TS</h3>
+                    <p className="text-3xl font-semibold text-white" title={memberTSData.clan_weekly_ts.toLocaleString('pt-BR')}>
+                      {formatCompactPtBR(memberTSData.clan_weekly_ts)}
                     </p>
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-stone-900 to-black border border-white/5 rounded-sm p-6 shadow-lg hover:border-white/20 transition-colors relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-stone-500/10 blur-[30px] rounded-full"></div>
+                <div className="soft-card rounded-sm p-6 relative overflow-hidden">
                   <div className="flex flex-col gap-2">
-                    <h3 className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">ALL TIME TS</h3>
-                    <p className="text-3xl font-bold text-stone-300 font-serif">
-                      {memberTSData.all_time_ts.toLocaleString('pt-BR')}
+                    <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">ALL TIME TS</h3>
+                    <p className="text-3xl font-semibold text-zinc-300" title={memberTSData.all_time_ts.toLocaleString('pt-BR')}>
+                      {formatCompactPtBR(memberTSData.all_time_ts)}
                     </p>
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-stone-900 to-black border border-white/5 rounded-sm p-6 shadow-lg hover:border-emerald-900/30 transition-colors relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-900/10 blur-[30px] rounded-full"></div>
+                <div className="soft-card rounded-sm p-6 relative overflow-hidden">
                   <div className="flex flex-col gap-2">
-                    <h3 className="text-xs font-serif font-bold text-stone-500 uppercase tracking-widest">TOTAL EXP</h3>
-                    <p className="text-3xl font-bold text-emerald-500 font-serif">
-                      {memberTSData.total_exp?.toLocaleString('pt-BR') || 0}
+                    <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-[0.12em]">TOTAL EXP</h3>
+                    <p className="text-3xl font-semibold text-emerald-500" title={(memberTSData.total_exp || 0).toLocaleString('pt-BR')}>
+                      {formatCompactPtBR(memberTSData.total_exp || 0)}
                     </p>
                   </div>
                 </div>

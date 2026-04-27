@@ -10,11 +10,19 @@ import { cn } from '../../lib/utils';
 import CasinoSettings from './CasinoSettings';
 import PowerRouletteSettings from './PowerRouletteSettings';
 import { formatDateTimePtBR, toMillis } from '../../lib/date';
+import {
+  isDonationExcluded,
+  normalizeBankRuns,
+  normalizeBankUsername,
+  type RawBankRun,
+} from '../../lib/bankLogs';
 
 const CARGOS = ['Leader', 'High Warden', 'Blade Master', 'Guardian', 'Gate Keeper', 'Street Cleaner'];
 
 type DonationAuditEntry = {
   id: string;
+  legacyId: string;
+  rowId: string;
   runId: string;
   entryId: string;
   username: string;
@@ -222,13 +230,8 @@ export default function GerenciarUsuarios() {
     }
   }
 
-  function parseAmountFromCurrency(currency: string): number {
-    const digits = (currency || '').replace(/\D/g, '');
-    return Number(digits || 0);
-  }
-
   function normalizeDonationUsername(username: string): string {
-    return (username || '').trim().toLowerCase();
+    return normalizeBankUsername(username || '');
   }
 
   function donationHiddenUserKey(username: string): string {
@@ -244,7 +247,7 @@ export default function GerenciarUsuarios() {
         get(ref(rtdb, 'config/donation_hidden_users')),
       ]);
 
-      const runsMap = (runsSnap.val() || {}) as Record<string, any>;
+      const runsMap = (runsSnap.val() || {}) as Record<string, RawBankRun>;
       const exclusionMap = (exclusionsSnap.val() || {}) as Record<string, boolean>;
       const hiddenUsersRaw = (hiddenUsersSnap.val() || {}) as Record<string, boolean>;
       const hiddenUsersMap: Record<string, boolean> = {};
@@ -259,52 +262,32 @@ export default function GerenciarUsuarios() {
         hiddenUsersMap[normalizeDonationUsername(decoded)] = true;
       });
 
-      const entries: DonationAuditEntry[] = [];
-      Object.entries(runsMap).forEach(([runId, runValue]) => {
-        const run = runValue as { bank?: Record<string, any> | any[] };
-        const bank = run?.bank;
-        if (!bank) return;
+      const entries: DonationAuditEntry[] = normalizeBankRuns(runsMap)
+        .filter((entry) => entry.action === 'give')
+        .map((entry) => {
+          const entryExcluded = isDonationExcluded(entry, exclusionMap);
+          const userHidden = Boolean(hiddenUsersMap[entry.usernameKey]);
 
-        const pairList: Array<[string, any]> = Array.isArray(bank)
-          ? bank.map((entry, index) => [String(index), entry])
-          : Object.entries(bank);
-
-        pairList.forEach(([entryId, rawEntry]) => {
-          const entry = rawEntry as { fields?: Record<string, unknown>; ingested_at?: string };
-          const fields = entry?.fields || {};
-          const action = String(fields.action || '').toLowerCase();
-          if (action !== 'give') return;
-
-          const username = String(fields.username || '').trim() || 'Unknown';
-          const usernameKey = normalizeDonationUsername(username);
-          const currency = String(fields.currency || '');
-          const amount = parseAmountFromCurrency(currency);
-          const isCredit = currency.toLowerCase().includes('credit');
-          const ingestedAt = typeof entry?.ingested_at === 'string' ? entry.ingested_at : '';
-          const ingestedTs = ingestedAt ? Date.parse(ingestedAt) : 0;
-          const id = `${runId}_${entryId}`;
-          const entryExcluded = Boolean(exclusionMap[id]);
-          const userHidden = Boolean(hiddenUsersMap[usernameKey]);
-
-          entries.push({
-            id,
-            runId,
-            entryId,
-            username,
-            usernameKey,
-            action,
-            currency,
-            amount,
-            isCredit,
-            time: String(fields.time || ''),
-            ingestedAt,
-            ingestedTs,
+          return {
+            id: entry.id,
+            legacyId: entry.legacyId,
+            rowId: entry.rowId,
+            runId: entry.runId,
+            entryId: entry.entryId,
+            username: entry.username || 'Unknown',
+            usernameKey: entry.usernameKey,
+            action: entry.action,
+            currency: entry.currency,
+            amount: entry.amount,
+            isCredit: entry.isCredit,
+            time: entry.time,
+            ingestedAt: entry.ingestedAt,
+            ingestedTs: entry.ingestedTs,
             entryExcluded,
             userHidden,
             excluded: entryExcluded || userHidden,
-          });
+          };
         });
-      });
 
       entries.sort((a, b) => Number(b.ingestedTs || 0) - Number(a.ingestedTs || 0));
       setDonationEntries(entries);
@@ -317,11 +300,15 @@ export default function GerenciarUsuarios() {
 
   async function toggleDonationExclusion(entry: DonationAuditEntry) {
     try {
-      const targetRef = ref(rtdb, `config/donation_exclusions/${entry.id}`);
       if (entry.entryExcluded) {
-        await remove(targetRef);
+        await Promise.all([
+          remove(ref(rtdb, `config/donation_exclusions/${entry.id}`)),
+          entry.legacyId !== entry.id
+            ? remove(ref(rtdb, `config/donation_exclusions/${entry.legacyId}`))
+            : Promise.resolve(),
+        ]);
       } else {
-        await set(targetRef, true);
+        await set(ref(rtdb, `config/donation_exclusions/${entry.id}`), true);
       }
       setDonationEntries(prev => prev.map(item => (
         item.id === entry.id
